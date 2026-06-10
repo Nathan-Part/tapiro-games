@@ -67,6 +67,7 @@ export class TapRaceRoom {
 
     socket.emit('GAME_STATE', { phase: this.state.phase, countdown: this.state.countdown, timeLeft: this.state.timeLeft })
     socket.emit('SCORE_UPDATE', { score: session.score })
+    this.io.to(this.roomId).emit('LEADERBOARD_UPDATE', { players: getLeaderboard(this.state) })
 
     this.registerTapHandler(socket)
     socket.on('disconnect', () => {
