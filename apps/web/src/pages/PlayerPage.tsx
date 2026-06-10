@@ -6,6 +6,9 @@ import type { PlayerViewState } from '@arcade/tap-race/client/types'
 import type { Phase } from '@arcade/tap-race/client/game'
 import { socket } from '../socket'
 import NotFoundPage from './NotFoundPage'
+import ParticleField from '../components/ParticleField'
+
+const delay = (ms: number) => ({ '--d': `${ms}ms` }) as React.CSSProperties
 
 const API = import.meta.env.VITE_SERVER_URL ?? 'http://localhost:4000'
 const storageKey = (code: string) => `tap-race-token-${code}`
@@ -21,6 +24,8 @@ export default function PlayerPage() {
   const [countdown, setCountdown] = useState(3)
   const [timeLeft, setTimeLeft] = useState(60)
   const [score, setScore] = useState(0)
+  const [waitingPlayers, setWaitingPlayers] = useState<{ id: string; name: string }[]>([])
+  const [totalPlayers, setTotalPlayers] = useState(0)
   const tapBuffer = useRef(0)
   const joinedRef = useRef(false)
 
@@ -88,6 +93,10 @@ export default function PlayerPage() {
       if (d.timeLeft !== undefined) setTimeLeft(d.timeLeft)
     })
     socket.on('SCORE_UPDATE', (d: { score: number }) => setScore(d.score))
+    socket.on('PLAYERS_UPDATE', (d: { players: { id: string; name: string }[]; total: number }) => {
+      setWaitingPlayers(d.players)
+      setTotalPlayers(d.total)
+    })
     const flush = setInterval(() => {
       if (tapBuffer.current > 0) {
         socket.emit('TAP_BATCH', { count: tapBuffer.current })
@@ -97,6 +106,7 @@ export default function PlayerPage() {
     return () => {
       socket.off('GAME_STATE')
       socket.off('SCORE_UPDATE')
+      socket.off('PLAYERS_UPDATE')
       clearInterval(flush)
     }
   }, [joined, code])
@@ -124,8 +134,12 @@ export default function PlayerPage() {
   // Chargement
   if (roomExists === null) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100dvh', background: '#0f0f0f', color: '#555', fontFamily: 'monospace' }}>
-        Vérification…
+      <div className="arc-screen">
+        <div className="arc-ambient" aria-hidden="true" />
+        <main className="arc-content" style={{ gap: '1.4rem' }}>
+          <div className="arc-spinner" />
+          <p className="arc-label">Vérification…</p>
+        </main>
       </div>
     )
   }
@@ -138,26 +152,41 @@ export default function PlayerPage() {
   // Formulaire de rejointe
   if (!joined) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100dvh', gap: '1rem', fontFamily: 'monospace', background: '#0f0f0f', color: '#fff' }}>
-        <h1 style={{ margin: 0 }}>Tap Race</h1>
-        <p style={{ color: '#aaa', margin: 0 }}>Room : <strong style={{ color: '#facc15' }}>{code}</strong></p>
-        <input
-          placeholder="Votre nom"
-          value={name}
-          onChange={e => setName(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && join()}
-          style={{ padding: '0.75rem 1rem', fontSize: '1.1rem', borderRadius: 8, border: 'none', textAlign: 'center' }}
-        />
-        <button
-          onClick={join}
-          style={{ padding: '0.75rem 2rem', fontSize: '1.1rem', borderRadius: 8, border: 'none', background: '#dc2626', color: '#fff', cursor: 'pointer' }}>
-          Rejoindre
-        </button>
+      <div className="arc-screen">
+        <div className="arc-ambient" aria-hidden="true" />
+        <ParticleField />
+        <main className="arc-content" style={{ gap: '1.1rem' }}>
+          <h1
+            className="arc-logo arc-logo--breathe arc-rise"
+            style={{ fontSize: 'clamp(2.2rem, 8vw, 3.6rem)', textAlign: 'center' }}
+          >
+            Tap&nbsp;Race
+          </h1>
+          <span className="arc-roomtag arc-rise" style={delay(100)}>
+            room {code}
+          </span>
+          <div className="arc-card arc-rise" style={{ ...delay(200), maxWidth: 380 }}>
+            <p className="arc-label">Identité du pilote</p>
+            <input
+              className="arc-input"
+              style={{ textAlign: 'center', fontSize: '1.25rem' }}
+              placeholder="Votre nom"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && join()}
+              maxLength={20}
+              autoComplete="off"
+            />
+            <button className="arc-btn arc-btn-primary" style={{ width: '100%' }} onClick={join}>
+              Rejoindre
+            </button>
+          </div>
+        </main>
       </div>
     )
   }
 
-  const state: PlayerViewState = { phase, countdown, timeLeft, score, playerName: name || 'Anonyme' }
+  const state: PlayerViewState = { phase, countdown, timeLeft, score, playerName: name || 'Anonyme', waitingPlayers, totalPlayers }
   return (
     <PlayerView
       state={state}

@@ -8,11 +8,25 @@ interface Props {
 
 export default function PlayerView({ state, onTap, onViewGlobalLeaderboard }: Props) {
   if (state.phase === 'WAITING') {
+    const players = state.waitingPlayers ?? []
+    const total = state.totalPlayers ?? players.length
     return (
       <div style={s.screen}>
         <h2 style={s.title}>Tap Race</h2>
         <p style={s.label}>En attente du démarrage…</p>
         <p style={s.name}>{state.playerName}</p>
+        {total > 0 && (
+          <div style={s.lobby}>
+            <p style={s.lobbyCount}>{total} joueur{total > 1 ? 's' : ''} connecté{total > 1 ? 's' : ''}</p>
+            <ul style={s.lobbyList}>
+              {players.map(p => (
+                <li key={p.id} style={{ ...s.lobbyItem, fontWeight: p.name === state.playerName ? 'bold' : 'normal', color: p.name === state.playerName ? '#facc15' : '#ccc' }}>
+                  {p.name}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
     )
   }
@@ -70,6 +84,18 @@ const s: Record<string, React.CSSProperties> = {
     touchAction: 'manipulation', userSelect: 'none',
     boxShadow: '0 8px 32px rgba(220,38,38,0.4)',
   },
+  lobby: {
+    width: '100%', maxWidth: '320px', background: '#1a1a1a',
+    borderRadius: 10, padding: '0.75rem 1rem',
+    display: 'flex', flexDirection: 'column', gap: '0.5rem',
+  },
+  lobbyCount: { margin: 0, fontSize: '0.8rem', color: '#888', textAlign: 'center' as const },
+  lobbyList: {
+    listStyle: 'none', padding: 0, margin: 0,
+    display: 'flex', flexDirection: 'column', gap: '0.3rem',
+    maxHeight: '40vh', overflowY: 'auto' as const,
+  },
+  lobbyItem: { fontSize: '1rem', padding: '0.2rem 0.4rem' },
   globalBtn: {
     padding: '0.75rem 2rem', fontSize: '1rem', borderRadius: '0.5rem',
     border: '1px solid #4ade80', background: 'transparent', color: '#4ade80',
