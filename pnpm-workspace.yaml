@@ -4,3 +4,4 @@ packages:
   - 'games/*'
 allowBuilds:
   '@biomejs/biome': true
+  esbuild: true
