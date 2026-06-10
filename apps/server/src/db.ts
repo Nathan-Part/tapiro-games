@@ -38,3 +38,26 @@ export function getTopScores(db: Database.Database): ScoreEntry[] {
     .prepare('SELECT id, name, score, playedAt FROM scores ORDER BY score DESC LIMIT 20')
     .all() as ScoreEntry[]
 }
+
+export interface PlayerStats {
+  name: string
+  gamesPlayed: number
+  bestScore: number
+  avgScore: number
+  history: { score: number; playedAt: string }[]
+}
+
+export function getPlayerStats(db: Database.Database, name: string): PlayerStats | null {
+  const rows = db
+    .prepare('SELECT score, playedAt FROM scores WHERE name = ? ORDER BY playedAt DESC')
+    .all(name) as { score: number; playedAt: string }[]
+  if (rows.length === 0) return null
+  const scores = rows.map(r => r.score)
+  return {
+    name,
+    gamesPlayed: rows.length,
+    bestScore: Math.max(...scores),
+    avgScore: Math.round(scores.reduce((a, b) => a + b, 0) / scores.length),
+    history: rows,
+  }
+}

@@ -1,7 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import { Server } from 'socket.io'
 import { RoomManager } from '@arcade/tap-race/server/roomManager'
-import { createDb, getTopScores, saveResults } from './db'
+import { createDb, getTopScores, saveResults, getPlayerStats } from './db'
 import { createRedisAdapter } from './redisAdapter'
 
 export function createApp(dbPath = process.env.DB_PATH ?? './arcade.db') {
@@ -34,6 +34,15 @@ export function createApp(dbPath = process.env.DB_PATH ?? './arcade.db') {
         res.writeHead(500, { 'Content-Type': 'text/plain' })
         res.end('Internal Server Error')
       }
+      return
+    }
+
+    const playerMatch = req.method === 'GET' && req.url?.match(/^\/api\/players\/(.+)$/)
+    if (playerMatch) {
+      const stats = getPlayerStats(db, decodeURIComponent(playerMatch[1]))
+      if (!stats) { res.writeHead(404, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'Joueur introuvable' })); return }
+      res.writeHead(200, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify(stats))
       return
     }
 
