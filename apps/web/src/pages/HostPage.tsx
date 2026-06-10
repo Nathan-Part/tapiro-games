@@ -18,7 +18,7 @@ export default function HostPage() {
   const [notFound, setNotFound] = useState(false)
 
   useEffect(() => {
-    QRCode.toDataURL(`${window.location.origin}/play/${code}`, { width: 200 }).then(setQrUrl)
+    QRCode.toDataURL(`${window.location.origin}/play/${code}`, { width: 400 }).then(setQrUrl)
   }, [code])
 
   useEffect(() => {
@@ -40,21 +40,14 @@ export default function HostPage() {
 
   if (notFound) return <NotFoundPage message="Room introuvable ou expirée." />
 
-  const state: HostViewState = { phase, countdown, timeLeft, leaderboard }
+  const state: HostViewState = { phase, countdown, timeLeft, leaderboard, roomCode: code }
 
   return (
-    <div style={{ position: 'relative' }}>
-      {phase === 'WAITING' && qrUrl && (
-        <div style={{ position: 'fixed', bottom: 16, right: 16, background: '#fff', padding: 8, borderRadius: 8, zIndex: 10, textAlign: 'center' }}>
-          <img src={qrUrl} alt="QR" width={120} height={120} />
-          <p style={{ margin: '4px 0 0', fontFamily: 'monospace', fontWeight: 'bold', fontSize: '1.2rem', color: '#000' }}>{code}</p>
-        </div>
-      )}
-      <HostView
-        state={state}
-        onStart={() => socket.emit('START_GAME', { code })}
-        onViewGlobalLeaderboard={() => navigate('/leaderboard')}
-      />
-    </div>
+    <HostView
+      state={state}
+      qrUrl={qrUrl}
+      onStart={() => socket.emit('START_GAME', { code })}
+      onViewGlobalLeaderboard={() => navigate('/leaderboard')}
+    />
   )
 }

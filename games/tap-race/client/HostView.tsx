@@ -2,15 +2,23 @@ import type { HostViewState, LeaderboardEntry } from './types'
 
 interface Props {
   state: HostViewState
+  qrUrl?: string
   onStart?: () => void
   onViewGlobalLeaderboard?: () => void
 }
 
-export default function HostView({ state, onStart, onViewGlobalLeaderboard }: Props) {
+export default function HostView({ state, qrUrl, onStart, onViewGlobalLeaderboard }: Props) {
   return (
     <div style={s.screen}>
       <Header state={state} onStart={onStart} onViewGlobalLeaderboard={onViewGlobalLeaderboard} />
       <Leaderboard entries={state.leaderboard} />
+      {state.phase === 'WAITING' && qrUrl && (
+        <div style={s.qrWrapper}>
+          <img src={qrUrl} alt="QR code" width={220} height={220} style={s.qrImg} />
+          <p style={s.qrCode}>{state.roomCode}</p>
+          <p style={s.qrLabel}>scannez pour rejoindre</p>
+        </div>
+      )}
     </div>
   )
 }
@@ -98,6 +106,12 @@ const s: Record<string, React.CSSProperties> = {
   rank: { color: '#facc15', width: '3rem', textAlign: 'center', fontWeight: 'bold' },
   pName: { flex: 1 },
   pScore: { fontWeight: 'bold', color: '#4ade80', fontSize: '1.8rem' },
+  qrWrapper: {
+    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.4rem',
+  },
+  qrImg: { borderRadius: 12, display: 'block' },
+  qrCode: { margin: 0, fontFamily: 'monospace', fontWeight: 'bold', fontSize: '1.8rem', color: '#facc15', letterSpacing: '0.2em' },
+  qrLabel: { margin: 0, color: '#666', fontSize: '0.8rem', letterSpacing: '0.05em' },
   globalBtn: {
     padding: '1rem 2.5rem', fontSize: '1.2rem', borderRadius: '0.5rem',
     border: '1px solid #4ade80', background: 'transparent', color: '#4ade80',

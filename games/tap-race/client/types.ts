@@ -19,4 +19,5 @@ export interface HostViewState {
   countdown: number
   timeLeft: number
   leaderboard: LeaderboardEntry[]
+  roomCode?: string
 }
