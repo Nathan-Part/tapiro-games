@@ -232,7 +232,11 @@ export default function PlayerPage() {
     )
   }
 
-  const state: PlayerViewState = { phase, countdown, timeLeft, score, playerName: name || 'Anonyme', waitingPlayers, totalPlayers, teamId: teamId ?? undefined, teams: teams.length > 0 ? teams : undefined }
+  const knownTeams: TeamScore[] | undefined =
+    teams.length > 0 ? teams
+    : roomInfo && roomInfo.teams.length > 0 ? roomInfo.teams.map(t => ({ ...t, score: 0 }))
+    : undefined
+  const state: PlayerViewState = { phase, countdown, timeLeft, score, playerName: name || 'Anonyme', waitingPlayers, totalPlayers, teamId: teamId ?? undefined, teams: knownTeams }
   return (
     <PlayerView
       state={state}

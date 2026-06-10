@@ -1,4 +1,4 @@
-import type { HostViewState, LeaderboardEntry } from './types'
+import type { HostViewState, LeaderboardEntry, TeamScore } from './types'
 import Confetti from './fx/Confetti'
 import { useCountUp } from './fx/useCountUp'
 import './tap-race.css'
@@ -64,11 +64,21 @@ function WaitingScreen({ state, qrUrl, onStart }: { state: HostViewState; qrUrl?
             {players.length} joueur{players.length > 1 ? 's' : ''} connecté{players.length > 1 ? 's' : ''}
           </p>
           <ul className="tr-lobby__list">
-            {players.map((p, i) => (
-              <li key={p.id} className="tr-chip" style={{ animationDelay: `${Math.min(i * 40, 600)}ms` }}>
-                {p.name}
-              </li>
-            ))}
+            {players.map((p, i) => {
+              const team = state.teams?.find(t => t.id === p.teamId)
+              return (
+                <li
+                  key={p.id}
+                  className="tr-chip"
+                  style={{
+                    animationDelay: `${Math.min(i * 40, 600)}ms`,
+                    ...(team ? { border: `2px solid ${team.color}`, background: `${team.color}14`, boxShadow: `0 0 10px ${team.color}40` } : {}),
+                  }}
+                >
+                  {p.name}
+                </li>
+              )
+            })}
           </ul>
         </div>
       )}
@@ -113,26 +123,42 @@ function PlayingScreen({ state }: { state: HostViewState }) {
         <p className="tr-live">En jeu</p>
       </div>
 
-      {state.teams && state.teams.length >= 2 && (
-        <div style={{ display: 'flex', gap: '1.5rem', width: '100%', maxWidth: 700 }}>
-          {state.teams.map(t => (
-            <div key={t.id} style={{
-              flex: 1, textAlign: 'center', padding: '1rem', borderRadius: 12,
-              background: `${t.color}18`, border: `2px solid ${t.color}`,
-            }}>
-              <p style={{ margin: 0, fontSize: '1rem', color: t.color, fontFamily: 'monospace', fontWeight: 'bold' }}>{t.name}</p>
-              <p style={{ margin: 0, fontSize: '2.8rem', fontWeight: 'bold', color: '#fff' }}>{t.score}</p>
-            </div>
-          ))}
-        </div>
-      )}
+      {state.teams && state.teams.length >= 2 && <TeamBattle teams={state.teams} />}
 
       <RankedBoard entries={state.leaderboard} teams={state.teams} />
     </div>
   )
 }
 
-function RankedBoard({ entries, teams }: { entries: LeaderboardEntry[]; teams?: import('./types').TeamScore[] }) {
+function TeamBattle({ teams }: { teams: TeamScore[] }) {
+  const total = teams.reduce((sum, t) => sum + t.score, 0)
+  const maxScore = Math.max(...teams.map(t => t.score))
+  return (
+    <div style={{ display: 'flex', gap: '1.5rem', width: '100%', maxWidth: 700, alignItems: 'stretch' }}>
+      {teams.map(t => {
+        const share = total > 0 ? t.score / total : 1 / teams.length
+        const grow = Math.min(0.8, Math.max(0.2, share))
+        const leading = total > 0 && t.score === maxScore
+        return (
+          <div key={t.id} style={{
+            flexGrow: grow, flexBasis: 0, minWidth: 0, textAlign: 'center', padding: '1rem', borderRadius: 12,
+            background: `${t.color}18`, border: `2px solid ${t.color}`,
+            boxShadow: leading ? `0 0 26px ${t.color}55` : 'none',
+            transition: 'flex-grow 0.35s ease, box-shadow 0.35s ease',
+          }}>
+            <p style={{ margin: 0, fontSize: '1rem', color: t.color, fontFamily: 'monospace', fontWeight: 'bold' }}>{t.name}</p>
+            <p style={{
+              margin: 0, fontWeight: 'bold', color: '#fff',
+              fontSize: `${(2 + grow * 1.8).toFixed(2)}rem`, transition: 'font-size 0.35s ease',
+            }}>{t.score}</p>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function RankedBoard({ entries, teams }: { entries: LeaderboardEntry[]; teams?: TeamScore[] }) {
   if (entries.length === 0) {
     return <p className="tr-empty">En attente de joueurs…</p>
   }

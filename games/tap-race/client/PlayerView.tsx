@@ -56,15 +56,22 @@ function WaitingScreen({ state }: { state: PlayerViewState }) {
             {total} joueur{total > 1 ? 's' : ''} connecté{total > 1 ? 's' : ''}
           </p>
           <ul className="tr-lobby__list">
-            {players.map((p, i) => (
-              <li
-                key={p.id}
-                className={`tr-chip${p.name === state.playerName ? ' tr-chip--me' : ''}`}
-                style={{ animationDelay: `${Math.min(i * 40, 600)}ms` }}
-              >
-                {p.name}
-              </li>
-            ))}
+            {players.map((p, i) => {
+              const team = state.teams?.find(t => t.id === p.teamId)
+              const me = p.name === state.playerName
+              return (
+                <li
+                  key={p.id}
+                  className={`tr-chip${me ? ' tr-chip--me' : ''}`}
+                  style={{
+                    animationDelay: `${Math.min(i * 40, 600)}ms`,
+                    ...(team ? { border: `2px solid ${team.color}`, boxShadow: `0 0 10px ${team.color}40`, ...(me ? {} : { background: `${team.color}14` }) } : {}),
+                  }}
+                >
+                  {p.name}
+                </li>
+              )
+            })}
           </ul>
         </div>
       )}
@@ -77,6 +84,8 @@ function PlayingScreen({ state, onTap }: { state: PlayerViewState; onTap: () => 
   const scoreRef = useRef<HTMLParagraphElement>(null)
   const displayed = useCountUp(state.score)
   const danger = state.timeLeft <= 10
+  const teams = state.teams && state.teams.length >= 2 ? state.teams : null
+  const teamTotal = teams ? teams.reduce((sum, t) => sum + t.score, 0) : 0
 
   function handleTap() {
     onTap()
@@ -102,18 +111,23 @@ function PlayingScreen({ state, onTap }: { state: PlayerViewState; onTap: () => 
         </div>
       </div>
 
-      {state.teams && state.teams.length >= 2 && (
-        <div style={{ display: 'flex', gap: '0.6rem', width: '100%', maxWidth: 340 }}>
-          {state.teams.map(t => (
-            <div key={t.id} style={{
-              flex: 1, textAlign: 'center', padding: '0.4rem 0.6rem', borderRadius: 8,
-              background: t.id === state.teamId ? `${t.color}22` : 'rgba(255,255,255,0.04)',
-              border: `1px solid ${t.id === state.teamId ? t.color : 'rgba(255,255,255,0.1)'}`,
-            }}>
-              <p style={{ margin: 0, fontSize: '0.7rem', color: t.id === state.teamId ? t.color : '#666', fontFamily: 'monospace' }}>{t.name}</p>
-              <p style={{ margin: 0, fontSize: '1.3rem', fontWeight: 'bold', color: t.id === state.teamId ? t.color : '#888' }}>{t.score}</p>
-            </div>
-          ))}
+      {teams && (
+        <div style={{ display: 'flex', gap: '0.6rem', width: '100%', maxWidth: 340, alignItems: 'stretch' }}>
+          {teams.map(t => {
+            const share = teamTotal > 0 ? t.score / teamTotal : 1 / teams.length
+            const grow = Math.min(0.7, Math.max(0.3, share))
+            return (
+              <div key={t.id} style={{
+                flexGrow: grow, flexBasis: 0, minWidth: 0, textAlign: 'center', padding: '0.4rem 0.6rem', borderRadius: 8,
+                background: t.id === state.teamId ? `${t.color}22` : 'rgba(255,255,255,0.04)',
+                border: `1px solid ${t.id === state.teamId ? t.color : 'rgba(255,255,255,0.1)'}`,
+                transition: 'flex-grow 0.35s ease',
+              }}>
+                <p style={{ margin: 0, fontSize: '0.7rem', color: t.id === state.teamId ? t.color : '#666', fontFamily: 'monospace' }}>{t.name}</p>
+                <p style={{ margin: 0, fontSize: '1.3rem', fontWeight: 'bold', color: t.id === state.teamId ? t.color : '#888' }}>{t.score}</p>
+              </div>
+            )
+          })}
         </div>
       )}
 

@@ -10,7 +10,8 @@ interface Particle {
 }
 
 const LINK_DIST = 120
-const POINTER_DIST = 160
+const POINTER_DIST = 220
+const REPEL_DIST = 45
 
 /**
  * Fond animé : réseau de particules cyan/violet sur canvas.
@@ -58,16 +59,31 @@ export default function ParticleField() {
       ctx.clearRect(0, 0, width, height)
 
       for (const p of particles) {
-        // attraction douce vers le curseur
         const pdx = pointer.x - p.x
         const pdy = pointer.y - p.y
         const pd = Math.hypot(pdx, pdy)
+
         if (pd < POINTER_DIST && pd > 0.01) {
-          p.vx += (pdx / pd) * 0.012
-          p.vy += (pdy / pd) * 0.012
+          if (pd < REPEL_DIST) {
+            // répulsion : empêche les particules de s'écraser sur le curseur
+            p.vx -= (pdx / pd) * 0.1
+            p.vy -= (pdy / pd) * 0.1
+            p.vx *= 0.88
+            p.vy *= 0.88
+          } else {
+            // attraction progressive — amortissement seulement dans la zone
+            const strength = (1 - pd / POINTER_DIST) * 0.06
+            p.vx += (pdx / pd) * strength
+            p.vy += (pdy / pd) * strength
+            p.vx *= 0.97
+            p.vy *= 0.97
+          }
         }
-        p.vx = Math.max(-0.6, Math.min(0.6, p.vx))
-        p.vy = Math.max(-0.6, Math.min(0.6, p.vy))
+        // hors zone : pas de damping, les particules gardent leur mouvement naturel
+
+        const maxSpeed = pd < POINTER_DIST ? 2.2 : 0.6
+        p.vx = Math.max(-maxSpeed, Math.min(maxSpeed, p.vx))
+        p.vy = Math.max(-maxSpeed, Math.min(maxSpeed, p.vy))
         p.x += p.vx
         p.y += p.vy
         if (p.x < -20) p.x = width + 20
