@@ -9,7 +9,7 @@ export default function AdminPage() {
   const [loggedIn, setLoggedIn] = useState(false)
   const [password, setPassword] = useState('')
   const [token, setToken] = useState('')
-  const [rooms, setRooms] = useState<string[]>([])
+  const [rooms, setRooms] = useState<{ code: string; phase: string; playerCount: number }[]>([])
   const [error, setError] = useState('')
   const [creating, setCreating] = useState(false)
   const creatingRef = useRef(false)
@@ -27,7 +27,7 @@ export default function AdminPage() {
         headers: { Authorization: `Bearer ${t}` },
       })
       if (res.status === 401) { setError('Mot de passe incorrect'); return }
-      const data = await res.json() as { rooms: string[] }
+      const data = await res.json() as { rooms: { code: string; phase: string; playerCount: number }[] }
       setToken(t)
       setRooms(data.rooms)
       setLoggedIn(true)
@@ -43,7 +43,7 @@ export default function AdminPage() {
         headers: { Authorization: `Bearer ${t}` },
       })
       if (!res.ok) return
-      const data = await res.json() as { rooms: string[] }
+      const data = await res.json() as { rooms: { code: string; phase: string; playerCount: number }[] }
       setRooms(data.rooms)
     } catch {}
   }
@@ -58,7 +58,7 @@ export default function AdminPage() {
         headers: { Authorization: `Bearer ${token}` },
       })
       const data = await res.json() as { code: string }
-      setRooms(prev => [...prev, data.code])
+      setRooms(prev => [...prev, { code: data.code, phase: 'WAITING', playerCount: 0 }])
     } finally {
       creatingRef.current = false
       setCreating(false)
@@ -70,7 +70,7 @@ export default function AdminPage() {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${token}` },
     })
-    setRooms(prev => prev.filter(r => r !== code))
+    setRooms(prev => prev.filter(r => r.code !== code))
   }
 
   function copyCode(code: string) {
@@ -89,116 +89,131 @@ export default function AdminPage() {
 
   if (!loggedIn) {
     return (
-      <div style={s.screen}>
-        <h1 style={s.title}>Admin</h1>
-        <form
-          style={s.loginForm}
-          onSubmit={e => { e.preventDefault(); tryLogin(password) }}
-        >
-          <input
-            type="password"
-            placeholder="Mot de passe"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            style={s.input}
-            autoFocus
-          />
-          <button type="submit" style={s.btn}>Se connecter</button>
-        </form>
-        {error && <p style={s.error}>{error}</p>}
+      <div className="arc-screen">
+        <div className="arc-ambient" aria-hidden="true" />
+        <main className="arc-content" style={{ gap: '1.2rem' }}>
+          <p className="arc-kicker arc-rise">/// zone restreinte ///</p>
+          <h1 className="arc-logo arc-rise" style={{ ...s.title, '--d': '80ms' } as React.CSSProperties}>
+            Admin
+          </h1>
+          <form
+            className="arc-card arc-rise"
+            style={{ ...s.loginForm, '--d': '180ms' } as React.CSSProperties}
+            onSubmit={e => { e.preventDefault(); tryLogin(password) }}
+          >
+            <p className="arc-label">Authentification</p>
+            <input
+              className="arc-input"
+              type="password"
+              placeholder="Mot de passe"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              autoFocus
+            />
+            <button type="submit" className="arc-btn arc-btn-primary" style={{ width: '100%' }}>
+              Se connecter
+            </button>
+            {error && <p className="arc-error">{error}</p>}
+          </form>
+        </main>
       </div>
     )
   }
 
   return (
-    <div style={s.screen}>
-      <div style={s.topBar}>
-        <h1 style={s.title}>Admin</h1>
-        <button style={s.logoutBtn} onClick={logout}>Déconnexion</button>
-      </div>
-
-      <div style={s.section}>
-        <div style={s.sectionHeader}>
-          <h2 style={s.subtitle}>Rooms actives ({rooms.length})</h2>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <button style={s.refreshBtn} onClick={() => loadRooms()}>↻</button>
-            <button style={s.createBtn} onClick={createRoom} disabled={creating}>
-              {creating ? '…' : '+ Créer'}
-            </button>
-          </div>
+    <div className="arc-screen arc-screen--top">
+      <div className="arc-ambient" aria-hidden="true" />
+      <main className="arc-content" style={{ gap: '1.5rem', maxWidth: 560, paddingTop: '1.5rem' }}>
+        <div className="arc-rise" style={s.topBar}>
+          <h1 className="arc-logo" style={s.title}>Admin</h1>
+          <button className="arc-btn arc-btn-ghost arc-btn--sm" onClick={logout}>
+            Déconnexion
+          </button>
         </div>
-        {rooms.length === 0
-          ? <p style={s.empty}>Aucune room active</p>
-          : (
-            <ul style={s.list}>
-              {rooms.map(code => (
-                <li key={code} style={s.roomRow} onClick={() => navigate(`/host/${code}`)}>
-                  <span style={s.code}>{code}</span>
-                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                    <button style={s.copyBtn} onClick={e => { e.stopPropagation(); copyCode(code) }}>
-                      {copied === code ? '✓' : '⎘ Copier'}
-                    </button>
-                    <button style={s.deleteBtn} onClick={e => { e.stopPropagation(); deleteRoom(code) }}>✕</button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )
-        }
-      </div>
+
+        <section className="arc-rise" style={{ ...s.section, '--d': '120ms' } as React.CSSProperties}>
+          <div style={s.sectionHeader}>
+            <h2 className="arc-label" style={{ fontSize: '0.9rem' }}>
+              Rooms actives <span style={s.count}>{rooms.length}</span>
+            </h2>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button className="arc-btn arc-btn-ghost arc-btn--sm" onClick={() => loadRooms()}>↻</button>
+              <button className="arc-btn arc-btn-primary arc-btn--sm" onClick={createRoom} disabled={creating}>
+                {creating ? '…' : '+ Créer'}
+              </button>
+            </div>
+          </div>
+          {rooms.length === 0
+            ? <p className="arc-hint" style={{ marginTop: '1.2rem' }}>Aucune room active</p>
+            : (
+              <ul style={s.list}>
+                {rooms.map((room, i) => (
+                  <li
+                    key={room.code}
+                    className="arc-row arc-row--click arc-rise"
+                    style={{ '--d': `${i * 60}ms` } as React.CSSProperties}
+                    onClick={() => navigate(`/host/${room.code}`)}
+                  >
+                    <span style={s.code}>{room.code}</span>
+                    <span style={{ ...s.badge, ...(room.phase !== 'WAITING' ? s.badgeLive : {}) }}>
+                      {room.phase === 'WAITING' && `${room.playerCount} joueur${room.playerCount > 1 ? 's' : ''}`}
+                      {room.phase === 'COUNTDOWN' && '⏳ Démarrage'}
+                      {room.phase === 'PLAYING' && `▶ En cours · ${room.playerCount}p`}
+                      {room.phase === 'RESULTS' && '✓ Terminée'}
+                    </span>
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginLeft: 'auto' }}>
+                      <button
+                        className="arc-btn arc-btn-ghost arc-btn--sm"
+                        onClick={e => { e.stopPropagation(); copyCode(room.code) }}
+                      >
+                        {copied === room.code ? '✓' : '⎘ Copier'}
+                      </button>
+                      <button
+                        className="arc-btn arc-btn-danger arc-btn--sm"
+                        onClick={e => { e.stopPropagation(); deleteRoom(room.code) }}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )
+          }
+        </section>
+      </main>
     </div>
   )
 }
 
 const s: Record<string, React.CSSProperties> = {
-  screen: {
-    display: 'flex', flexDirection: 'column', alignItems: 'center',
-    minHeight: '100dvh', fontFamily: 'monospace', background: '#0f0f0f',
-    color: '#fff', padding: '2rem', gap: '1.5rem', boxSizing: 'border-box',
-  },
   topBar: {
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-    width: '100%', maxWidth: '500px',
+    width: '100%',
   },
-  title: { fontSize: '2rem', margin: 0 },
-  loginForm: { display: 'flex', flexDirection: 'column', gap: '0.75rem', width: '100%', maxWidth: '320px' },
-  input: {
-    padding: '0.75rem 1rem', fontSize: '1rem', borderRadius: 8,
-    border: '1px solid #333', background: '#1a1a1a', color: '#fff',
+  title: { fontSize: '1.8rem' },
+  loginForm: { maxWidth: 360 },
+  section: { width: '100%' },
+  sectionHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem' },
+  count: {
+    display: 'inline-block', minWidth: '1.6em', textAlign: 'center',
+    marginLeft: '0.4em', padding: '0.1em 0.4em', borderRadius: 99,
+    background: 'rgba(0, 245, 255, 0.1)', border: '1px solid rgba(0, 245, 255, 0.3)',
+    color: 'var(--cyan)', fontFamily: 'var(--font-term)',
   },
-  btn: {
-    padding: '0.75rem 1.5rem', borderRadius: 8, border: 'none',
-    background: '#2563eb', color: '#fff', cursor: 'pointer', fontSize: '1rem',
+  list: { listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.6rem' },
+  code: {
+    fontSize: '1.45rem', fontFamily: 'var(--font-display)', fontWeight: 700,
+    color: 'var(--cyan)', letterSpacing: '0.22em',
+    textShadow: '0 0 12px rgba(0, 245, 255, 0.5)',
   },
-  logoutBtn: {
-    padding: '0.4rem 0.9rem', borderRadius: 6, border: '1px solid #444',
-    background: 'transparent', color: '#888', cursor: 'pointer', fontSize: '0.85rem',
+  badge: {
+    fontSize: '0.75rem', padding: '0.2em 0.6em', borderRadius: 99,
+    background: 'rgba(255,255,255,0.07)', color: '#888',
+    fontFamily: 'monospace', whiteSpace: 'nowrap' as const,
   },
-  error: { color: '#f87171', margin: 0 },
-  section: { width: '100%', maxWidth: '500px' },
-  sectionHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' },
-  subtitle: { fontSize: '1.2rem', margin: 0 },
-  refreshBtn: {
-    padding: '0.4rem 0.7rem', borderRadius: 6, border: '1px solid #333',
-    background: 'transparent', color: '#aaa', cursor: 'pointer', fontSize: '1rem',
-  },
-  createBtn: {
-    padding: '0.5rem 1rem', borderRadius: 8, border: 'none',
-    background: '#16a34a', color: '#fff', cursor: 'pointer', fontSize: '0.9rem',
-  },
-  empty: { color: '#555', margin: '1rem 0 0' },
-  list: { listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.5rem' },
-  roomRow: {
-    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    padding: '0.75rem 1rem', background: '#1a1a1a', borderRadius: 8,
-  },
-  code: { fontSize: '1.5rem', fontWeight: 'bold', color: '#facc15', letterSpacing: '0.1em', cursor: 'pointer' },
-  copyBtn: {
-    padding: '0.3rem 0.7rem', borderRadius: 6, border: '1px solid #333',
-    background: 'transparent', color: '#aaa', cursor: 'pointer', fontSize: '0.8rem',
-  },
-  deleteBtn: {
-    padding: '0.3rem 0.6rem', borderRadius: 6, border: 'none',
-    background: '#7f1d1d', color: '#f87171', cursor: 'pointer', fontSize: '0.9rem',
+  badgeLive: {
+    background: 'rgba(74,222,128,0.15)', color: '#4ade80',
+    border: '1px solid rgba(74,222,128,0.3)',
   },
 }
