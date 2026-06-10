@@ -44,6 +44,7 @@ export function serverReducer(state: ServerGameState, event: ServerEvent): Serve
       }
 
     case 'PLAYER_LEAVE': {
+      if (state.phase === 'RESULTS') return state
       const players = { ...state.players }
       delete players[event.id]
       return { ...state, players }
