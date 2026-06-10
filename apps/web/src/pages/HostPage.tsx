@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import QRCode from 'qrcode'
 import HostView from '@arcade/tap-race/client/HostView'
 import type { HostViewState, LeaderboardEntry } from '@arcade/tap-race/client/types'
@@ -8,6 +8,7 @@ import { socket } from '../socket'
 
 export default function HostPage() {
   const { code } = useParams<{ code: string }>()
+  const navigate = useNavigate()
   const [phase, setPhase] = useState<Phase>('WAITING')
   const [countdown, setCountdown] = useState(3)
   const [timeLeft, setTimeLeft] = useState(60)
@@ -40,7 +41,11 @@ export default function HostPage() {
           <p style={{ margin: '4px 0 0', fontFamily: 'monospace', fontWeight: 'bold', fontSize: '1.2rem', color: '#000' }}>{code}</p>
         </div>
       )}
-      <HostView state={state} onStart={() => socket.emit('START_GAME', { code })} />
+      <HostView
+        state={state}
+        onStart={() => socket.emit('START_GAME', { code })}
+        onViewGlobalLeaderboard={() => navigate('/leaderboard')}
+      />
     </div>
   )
 }

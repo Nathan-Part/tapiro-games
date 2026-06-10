@@ -3,9 +3,10 @@ import type { PlayerViewState } from './types'
 interface Props {
   state: PlayerViewState
   onTap: () => void
+  onViewGlobalLeaderboard?: () => void
 }
 
-export default function PlayerView({ state, onTap }: Props) {
+export default function PlayerView({ state, onTap, onViewGlobalLeaderboard }: Props) {
   if (state.phase === 'WAITING') {
     return (
       <div style={s.screen}>
@@ -40,6 +41,11 @@ export default function PlayerView({ state, onTap }: Props) {
       <h2 style={s.title}>Terminé !</h2>
       <p style={s.huge}>{state.score}</p>
       <p style={s.label}>taps</p>
+      {onViewGlobalLeaderboard && (
+        <button style={s.globalBtn} onClick={onViewGlobalLeaderboard}>
+          Voir score global
+        </button>
+      )}
     </div>
   )
 }
@@ -63,5 +69,10 @@ const s: Record<string, React.CSSProperties> = {
     background: '#dc2626', color: '#fff', cursor: 'pointer',
     touchAction: 'manipulation', userSelect: 'none',
     boxShadow: '0 8px 32px rgba(220,38,38,0.4)',
+  },
+  globalBtn: {
+    padding: '0.75rem 2rem', fontSize: '1rem', borderRadius: '0.5rem',
+    border: '1px solid #4ade80', background: 'transparent', color: '#4ade80',
+    cursor: 'pointer', marginTop: '0.5rem',
   },
 }

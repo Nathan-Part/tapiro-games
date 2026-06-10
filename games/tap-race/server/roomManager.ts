@@ -9,12 +9,19 @@ function generateCode(): string {
 export class RoomManager {
   private rooms = new Map<string, TapRaceRoom>()
 
-  constructor(private readonly io: Server) {}
+  constructor(
+    private readonly io: Server,
+    private readonly db?: { saveResults: (players: { name: string; score: number }[]) => void },
+  ) {}
 
   create(): string {
     let code = generateCode()
     while (this.rooms.has(code)) code = generateCode()
-    this.rooms.set(code, new TapRaceRoom(this.io, code))
+    const db = this.db
+    const saveResultsFn = db
+      ? (players: { name: string; score: number }[]) => db.saveResults(players)
+      : () => {}
+    this.rooms.set(code, new TapRaceRoom(this.io, code, saveResultsFn))
     return code
   }
 

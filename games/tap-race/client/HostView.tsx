@@ -3,18 +3,19 @@ import type { HostViewState, LeaderboardEntry } from './types'
 interface Props {
   state: HostViewState
   onStart?: () => void
+  onViewGlobalLeaderboard?: () => void
 }
 
-export default function HostView({ state, onStart }: Props) {
+export default function HostView({ state, onStart, onViewGlobalLeaderboard }: Props) {
   return (
     <div style={s.screen}>
-      <Header state={state} onStart={onStart} />
+      <Header state={state} onStart={onStart} onViewGlobalLeaderboard={onViewGlobalLeaderboard} />
       <Leaderboard entries={state.leaderboard} />
     </div>
   )
 }
 
-function Header({ state, onStart }: { state: HostViewState; onStart?: () => void }) {
+function Header({ state, onStart, onViewGlobalLeaderboard }: { state: HostViewState; onStart?: () => void; onViewGlobalLeaderboard?: () => void }) {
   if (state.phase === 'WAITING') {
     return (
       <div style={s.header}>
@@ -46,6 +47,11 @@ function Header({ state, onStart }: { state: HostViewState; onStart?: () => void
   return (
     <div style={s.header}>
       <h2 style={s.gameTitle}>Résultats finaux</h2>
+      {onViewGlobalLeaderboard && (
+        <button style={s.globalBtn} onClick={onViewGlobalLeaderboard}>
+          Voir score global
+        </button>
+      )}
     </div>
   )
 }
@@ -92,4 +98,9 @@ const s: Record<string, React.CSSProperties> = {
   rank: { color: '#facc15', width: '3rem', textAlign: 'center', fontWeight: 'bold' },
   pName: { flex: 1 },
   pScore: { fontWeight: 'bold', color: '#4ade80', fontSize: '1.8rem' },
+  globalBtn: {
+    padding: '1rem 2.5rem', fontSize: '1.2rem', borderRadius: '0.5rem',
+    border: '1px solid #4ade80', background: 'transparent', color: '#4ade80',
+    cursor: 'pointer',
+  },
 }

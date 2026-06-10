@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import PlayerView from '@arcade/tap-race/client/PlayerView'
 import type { PlayerViewState } from '@arcade/tap-race/client/types'
 import type { Phase } from '@arcade/tap-race/client/game'
@@ -7,6 +7,7 @@ import { socket } from '../socket'
 
 export default function PlayerPage() {
   const { code } = useParams<{ code: string }>()
+  const navigate = useNavigate()
   const [name, setName] = useState('')
   const [joined, setJoined] = useState(false)
   const [phase, setPhase] = useState<Phase>('WAITING')
@@ -55,5 +56,11 @@ export default function PlayerPage() {
   }
 
   const state: PlayerViewState = { phase, countdown, timeLeft, score, playerName: name || 'Anonyme' }
-  return <PlayerView state={state} onTap={() => { tapBuffer.current += 1 }} />
+  return (
+    <PlayerView
+      state={state}
+      onTap={() => { tapBuffer.current += 1 }}
+      onViewGlobalLeaderboard={() => navigate('/leaderboard')}
+    />
+  )
 }

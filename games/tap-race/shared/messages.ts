@@ -20,3 +20,10 @@ export type TapBatch = z.infer<typeof TapBatchSchema>
 export type ScoreUpdate = z.infer<typeof ScoreUpdateSchema>
 export type LeaderboardUpdate = z.infer<typeof LeaderboardUpdateSchema>
 export type GameStateUpdate = z.infer<typeof GameStateUpdateSchema>
+
+export const RejoinRoomSchema = z.object({
+  code: z.string().min(1).max(10),
+  token: z.string().uuid(),
+})
+
+export type RejoinRoom = z.infer<typeof RejoinRoomSchema>
