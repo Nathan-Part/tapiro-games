@@ -8,7 +8,7 @@ import NotFoundPage from './pages/NotFoundPage'
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename="/tapi">
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/host/:code" element={<HostPage />} />
