@@ -11,7 +11,9 @@
   "dependencies": {
     "@arcade/shared": "workspace:*",
     "@arcade/tap-race": "workspace:*",
+    "@socket.io/redis-adapter": "^8.3.0",
     "better-sqlite3": "^12.10.0",
+    "ioredis": "^5.11.1",
     "socket.io": "^4.8.0",
     "zod": "^3.24.0"
   },

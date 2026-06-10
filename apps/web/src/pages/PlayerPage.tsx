@@ -5,6 +5,8 @@ import type { PlayerViewState } from '@arcade/tap-race/client/types'
 import type { Phase } from '@arcade/tap-race/client/game'
 import { socket } from '../socket'
 
+const storageKey = (code: string) => `tap-race-token-${code}`
+
 export default function PlayerPage() {
   const { code } = useParams<{ code: string }>()
   const navigate = useNavigate()
@@ -16,6 +18,28 @@ export default function PlayerPage() {
   const [score, setScore] = useState(0)
   const tapBuffer = useRef(0)
 
+  // Auto-rejoin if token exists for this room
+  useEffect(() => {
+    if (!code) return
+    const existingToken = localStorage.getItem(storageKey(code))
+    if (!existingToken) return
+    socket.connect()
+    const onConnect = () => {
+      socket.emit('REJOIN_ROOM', { code: code.toUpperCase(), token: existingToken })
+    }
+    const onError = () => {
+      localStorage.removeItem(storageKey(code))
+    }
+    socket.once('connect', onConnect)
+    socket.once('ERROR', onError)
+    setJoined(true)
+    return () => {
+      socket.off('connect', onConnect)
+      socket.off('ERROR', onError)
+    }
+  }, [code])
+
+  // Register game event listeners once joined
   useEffect(() => {
     if (!joined) return
     socket.on('GAME_STATE', (d: { phase: Phase; countdown?: number; timeLeft?: number }) => {
@@ -24,18 +48,28 @@ export default function PlayerPage() {
       if (d.timeLeft !== undefined) setTimeLeft(d.timeLeft)
     })
     socket.on('SCORE_UPDATE', (d: { score: number }) => setScore(d.score))
+    socket.on('JOINED', (d: { token: string }) => {
+      if (code) localStorage.setItem(storageKey(code), d.token)
+    })
     const flush = setInterval(() => {
       if (tapBuffer.current > 0) {
         socket.emit('TAP_BATCH', { count: tapBuffer.current })
         tapBuffer.current = 0
       }
     }, 200)
-    return () => { socket.off('GAME_STATE'); socket.off('SCORE_UPDATE'); clearInterval(flush) }
-  }, [joined])
+    return () => {
+      socket.off('GAME_STATE')
+      socket.off('SCORE_UPDATE')
+      socket.off('JOINED')
+      clearInterval(flush)
+    }
+  }, [joined, code])
 
   function join() {
     socket.connect()
-    socket.emit('JOIN_ROOM', { code: code?.toUpperCase(), name: name || 'Anonyme' })
+    socket.once('connect', () => {
+      socket.emit('JOIN_ROOM', { code: code?.toUpperCase(), name: name || 'Anonyme' })
+    })
     setJoined(true)
   }
 

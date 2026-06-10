@@ -1,6 +1,8 @@
 import type { Server } from 'socket.io'
 import { TapRaceRoom } from './tapRaceRoom'
 
+const DEFAULT_TIMEOUT_MS = 30 * 60 * 1000
+
 function generateCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
   return Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
@@ -8,11 +10,18 @@ function generateCode(): string {
 
 export class RoomManager {
   private rooms = new Map<string, TapRaceRoom>()
+  private cleanupInterval: ReturnType<typeof setInterval>
 
   constructor(
     private readonly io: Server,
     private readonly db?: { saveResults: (players: { name: string; score: number }[]) => void },
-  ) {}
+    private readonly inactivityTimeoutMs: number = DEFAULT_TIMEOUT_MS,
+  ) {
+    this.cleanupInterval = setInterval(
+      () => this.cleanup(),
+      Math.min(inactivityTimeoutMs, 60_000),
+    )
+  }
 
   create(): string {
     let code = generateCode()
@@ -27,5 +36,18 @@ export class RoomManager {
 
   get(code: string): TapRaceRoom | undefined {
     return this.rooms.get(code)
+  }
+
+  destroy() {
+    clearInterval(this.cleanupInterval)
+  }
+
+  private cleanup() {
+    const now = Date.now()
+    for (const [code, room] of this.rooms) {
+      if (now - room.lastActivity > this.inactivityTimeoutMs) {
+        this.rooms.delete(code)
+      }
+    }
   }
 }

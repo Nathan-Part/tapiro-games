@@ -56,16 +56,12 @@ export class TapRaceRoom {
     session.socketId = socket.id
 
     socket.join(this.roomId)
-    this.state = serverReducer(this.state, { type: 'PLAYER_JOIN', id: socket.id, name: session.name })
-
-    if (this.state.players[socket.id]) {
-      this.state = {
-        ...this.state,
-        players: {
-          ...this.state.players,
-          [socket.id]: { ...this.state.players[socket.id], score: session.score },
-        },
-      }
+    this.state = {
+      ...this.state,
+      players: {
+        ...this.state.players,
+        [socket.id]: { id: socket.id, name: session.name, score: session.score },
+      },
     }
 
     socket.emit('GAME_STATE', { phase: this.state.phase, countdown: this.state.countdown, timeLeft: this.state.timeLeft })
