@@ -45,6 +45,7 @@ export class TapRaceRoom {
         if (currentPlayer) entry[1].score = currentPlayer.score
       }
       this.state = serverReducer(this.state, { type: 'PLAYER_LEAVE', id: socket.id })
+      this.io.to(this.roomId).emit('LEADERBOARD_UPDATE', { players: getLeaderboard(this.state) })
     })
   }
 
@@ -75,9 +76,21 @@ export class TapRaceRoom {
         if (currentPlayer) s.score = currentPlayer.score
       }
       this.state = serverReducer(this.state, { type: 'PLAYER_LEAVE', id: socket.id })
+      this.io.to(this.roomId).emit('LEADERBOARD_UPDATE', { players: getLeaderboard(this.state) })
     })
 
     return true
+  }
+
+  leave(socket: Socket) {
+    const entry = [...this.sessions.entries()].find(([, s]) => s.socketId === socket.id)
+    if (entry) {
+      const currentPlayer = this.state.players[socket.id]
+      if (currentPlayer) entry[1].score = currentPlayer.score
+    }
+    this.state = serverReducer(this.state, { type: 'PLAYER_LEAVE', id: socket.id })
+    this.io.to(this.roomId).emit('LEADERBOARD_UPDATE', { players: getLeaderboard(this.state) })
+    socket.leave(this.roomId)
   }
 
   watchAsHost(socket: Socket) {

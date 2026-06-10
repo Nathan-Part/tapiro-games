@@ -30,7 +30,7 @@ export const initialServerState: ServerGameState = {
 export function serverReducer(state: ServerGameState, event: ServerEvent): ServerGameState {
   switch (event.type) {
     case 'PLAYER_JOIN':
-      if (state.phase !== 'WAITING') return state
+      if (state.phase === 'RESULTS') return state
       return {
         ...state,
         players: { ...state.players, [event.id]: { id: event.id, name: event.name, score: 0 } },

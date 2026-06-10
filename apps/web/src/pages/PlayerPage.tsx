@@ -9,6 +9,7 @@ import NotFoundPage from './NotFoundPage'
 
 const API = import.meta.env.VITE_SERVER_URL ?? 'http://localhost:4000'
 const storageKey = (code: string) => `tap-race-token-${code}`
+const nameKey = (code: string) => `tap-race-name-${code}`
 
 export default function PlayerPage() {
   const { code } = useParams<{ code: string }>()
@@ -21,6 +22,7 @@ export default function PlayerPage() {
   const [timeLeft, setTimeLeft] = useState(60)
   const [score, setScore] = useState(0)
   const tapBuffer = useRef(0)
+  const joinedRef = useRef(false)
 
   // Vérification HTTP : la room existe-t-elle ?
   useEffect(() => {
@@ -36,14 +38,24 @@ export default function PlayerPage() {
     const existingToken = localStorage.getItem(storageKey(code))
     if (!existingToken) return
 
+    const savedName = localStorage.getItem(nameKey(code))
+    if (savedName) setName(savedName)
+
     const doRejoin = () => {
       socket.emit('REJOIN_ROOM', { code: code.toUpperCase(), token: existingToken })
     }
     const onError = () => {
       localStorage.removeItem(storageKey(code))
+      localStorage.removeItem(nameKey(code))
       setJoined(false)
     }
-    const onGameState = () => setJoined(true)
+    const onGameState = (d: { phase: Phase; countdown?: number; timeLeft?: number }) => {
+      setPhase(d.phase)
+      if (d.countdown !== undefined) setCountdown(d.countdown)
+      if (d.timeLeft !== undefined) setTimeLeft(d.timeLeft)
+      joinedRef.current = true
+      setJoined(true)
+    }
 
     socket.once('ERROR', onError)
     socket.once('GAME_STATE', onGameState)
@@ -57,6 +69,16 @@ export default function PlayerPage() {
     }
   }, [code, roomExists])
 
+  // Quitter proprement au démontage du composant
+  useEffect(() => {
+    return () => {
+      if (code && joinedRef.current) {
+        socket.emit('LEAVE_ROOM', { code: code.toUpperCase() })
+        joinedRef.current = false
+      }
+    }
+  }, [code])
+
   // Listeners de jeu
   useEffect(() => {
     if (!joined) return
@@ -66,9 +88,6 @@ export default function PlayerPage() {
       if (d.timeLeft !== undefined) setTimeLeft(d.timeLeft)
     })
     socket.on('SCORE_UPDATE', (d: { score: number }) => setScore(d.score))
-    socket.on('JOINED', (d: { token: string }) => {
-      if (code) localStorage.setItem(storageKey(code), d.token)
-    })
     const flush = setInterval(() => {
       if (tapBuffer.current > 0) {
         socket.emit('TAP_BATCH', { count: tapBuffer.current })
@@ -78,14 +97,26 @@ export default function PlayerPage() {
     return () => {
       socket.off('GAME_STATE')
       socket.off('SCORE_UPDATE')
-      socket.off('JOINED')
       clearInterval(flush)
     }
   }, [joined, code])
 
   function join() {
-    socket.once('JOINED', () => setJoined(true))
-    const emit = () => socket.emit('JOIN_ROOM', { code: code?.toUpperCase(), name: name || 'Anonyme' })
+    const n = name || 'Anonyme'
+    const emit = () => socket.emit('JOIN_ROOM', { code: code?.toUpperCase(), name: n })
+    socket.once('JOINED', (d: { token: string }) => {
+      if (code) {
+        localStorage.setItem(storageKey(code), d.token)
+        localStorage.setItem(nameKey(code), n)
+      }
+    })
+    socket.once('GAME_STATE', (d: { phase: Phase; countdown?: number; timeLeft?: number }) => {
+      setPhase(d.phase)
+      if (d.countdown !== undefined) setCountdown(d.countdown)
+      if (d.timeLeft !== undefined) setTimeLeft(d.timeLeft)
+      joinedRef.current = true
+      setJoined(true)
+    })
     if (socket.connected) { emit() }
     else { socket.once('connect', emit); socket.connect() }
   }

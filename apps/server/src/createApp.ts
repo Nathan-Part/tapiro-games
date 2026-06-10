@@ -133,6 +133,11 @@ export function createApp(dbPath = process.env.DB_PATH ?? './arcade.db') {
       manager.get(data.code?.toUpperCase())?.start()
     })
 
+    socket.on('LEAVE_ROOM', (data: { code: string }) => {
+      const room = manager.get(data.code?.toUpperCase())
+      if (room) room.leave(socket)
+    })
+
     socket.on('REJOIN_ROOM', (data: { code: string; token: string }) => {
       for (const r of socket.rooms) { if (r !== socket.id) socket.leave(r) }
       const room = manager.get(data.code?.toUpperCase())
