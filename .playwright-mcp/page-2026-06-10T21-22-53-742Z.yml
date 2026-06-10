@@ -1,7 +1,0 @@
-- main [ref=e4]:
-  - heading "Tap Race" [level=1] [ref=e5]
-  - generic [ref=e6]: room XXF7
-  - generic [ref=e7]:
-    - paragraph [ref=e8]: Identité du pilote
-    - textbox "Votre nom" [ref=e9]
-    - button "Rejoindre" [ref=e10] [cursor=pointer]

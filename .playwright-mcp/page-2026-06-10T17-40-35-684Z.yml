@@ -1,9 +1,0 @@
-- generic [ref=e6]:
-  - generic [ref=e7]:
-    - img "QR" [ref=e8]
-    - paragraph [ref=e9]: HB2N
-  - generic [ref=e10]:
-    - generic [ref=e11]:
-      - heading "Tap Race" [level=1] [ref=e12]
-      - button "Démarrer la partie" [ref=e13] [cursor=pointer]
-    - paragraph [ref=e14]: En attente de joueurs…

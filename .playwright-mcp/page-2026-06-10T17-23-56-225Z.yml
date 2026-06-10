@@ -1,8 +1,0 @@
-- generic [ref=e2]:
-  - generic [ref=e3]:
-    - button "PlayerView" [ref=e4] [cursor=pointer]
-    - button "HostView" [ref=e5] [cursor=pointer]
-  - generic [ref=e6]:
-    - paragraph [ref=e7]: 42s
-    - paragraph [ref=e8]: "137"
-    - button "TAP" [ref=e9] [cursor=pointer]

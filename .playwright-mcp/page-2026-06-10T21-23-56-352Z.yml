@@ -1,9 +1,0 @@
-- generic [ref=e3]:
-  - paragraph [ref=e4]: /// scan & play ///
-  - heading "Tap Race" [level=1] [ref=e5]
-  - generic [ref=e6]:
-    - img "QR code" [ref=e7]
-    - paragraph [ref=e8]: XXF7
-    - paragraph [ref=e9]: scannez pour rejoindre
-  - button "Démarrer la partie" [ref=e10] [cursor=pointer]
-  - paragraph [ref=e11]: En attente de joueurs…
