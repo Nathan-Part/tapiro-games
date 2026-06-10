@@ -37,6 +37,14 @@ export function createApp(dbPath = process.env.DB_PATH ?? './arcade.db') {
       return
     }
 
+    const roomCheckMatch = req.method === 'GET' && req.url?.match(/^\/api\/rooms\/([A-Z0-9]+)$/)
+    if (roomCheckMatch) {
+      const exists = manager.get(roomCheckMatch[1]) !== undefined
+      res.writeHead(exists ? 200 : 404, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({ exists }))
+      return
+    }
+
     if (req.url?.startsWith('/api/admin/')) {
       if (!isAdminAuthorized(req)) {
         res.writeHead(401, { 'Content-Type': 'application/json' })
