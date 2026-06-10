@@ -113,30 +113,47 @@ function PlayingScreen({ state }: { state: HostViewState }) {
         <p className="tr-live">En jeu</p>
       </div>
 
-      <RankedBoard entries={state.leaderboard} />
+      {state.teams && state.teams.length >= 2 && (
+        <div style={{ display: 'flex', gap: '1.5rem', width: '100%', maxWidth: 700 }}>
+          {state.teams.map(t => (
+            <div key={t.id} style={{
+              flex: 1, textAlign: 'center', padding: '1rem', borderRadius: 12,
+              background: `${t.color}18`, border: `2px solid ${t.color}`,
+            }}>
+              <p style={{ margin: 0, fontSize: '1rem', color: t.color, fontFamily: 'monospace', fontWeight: 'bold' }}>{t.name}</p>
+              <p style={{ margin: 0, fontSize: '2.8rem', fontWeight: 'bold', color: '#fff' }}>{t.score}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <RankedBoard entries={state.leaderboard} teams={state.teams} />
     </div>
   )
 }
 
-function RankedBoard({ entries }: { entries: LeaderboardEntry[] }) {
+function RankedBoard({ entries, teams }: { entries: LeaderboardEntry[]; teams?: import('./types').TeamScore[] }) {
   if (entries.length === 0) {
     return <p className="tr-empty">En attente de joueurs…</p>
   }
   const max = Math.max(1, ...entries.map(e => e.score))
   return (
     <div className="tr-board" style={{ height: entries.length * ROW_STEP - (ROW_STEP - ROW_HEIGHT) }}>
-      {entries.map((e, i) => (
-        <div
-          key={e.id}
-          className={`tr-boardrow${i === 0 && e.score > 0 ? ' tr-boardrow--lead' : ''}`}
-          style={{ transform: `translateY(${i * ROW_STEP}px)` }}
-        >
-          <div className="tr-boardrow__bar" style={{ width: `${(e.score / max) * 100}%` }} aria-hidden="true" />
-          <span className={`tr-rank${i < 3 ? ` tr-rank--${i + 1}` : ''}`}>{i + 1}</span>
-          <span className="tr-boardrow__name">{e.name}</span>
-          <AnimatedScore value={e.score} />
-        </div>
-      ))}
+      {entries.map((e, i) => {
+        const team = teams?.find(t => t.id === e.teamId)
+        return (
+          <div
+            key={e.id}
+            className={`tr-boardrow${i === 0 && e.score > 0 ? ' tr-boardrow--lead' : ''}`}
+            style={{ transform: `translateY(${i * ROW_STEP}px)`, borderLeft: team ? `3px solid ${team.color}` : undefined }}
+          >
+            <div className="tr-boardrow__bar" style={{ width: `${(e.score / max) * 100}%` }} aria-hidden="true" />
+            <span className={`tr-rank${i < 3 ? ` tr-rank--${i + 1}` : ''}`}>{i + 1}</span>
+            <span className="tr-boardrow__name">{e.name}</span>
+            <AnimatedScore value={e.score} />
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -165,9 +182,28 @@ function ResultsScreen({ state, onViewGlobalLeaderboard }: { state: HostViewStat
       <Confetti delay={1100} />
 
       <p className="tr-kicker tr-rise">/// course terminée ///</p>
-      <h2 className="tr-logo tr-rise" style={{ ...delay(80), fontSize: 'clamp(2rem, 6vmin, 3.6rem)' }}>
-        Résultats finaux
-      </h2>
+      {state.teams && state.teams.length >= 2 ? (() => {
+        const winner = state.teams.reduce((a, b) => a.score >= b.score ? a : b)
+        return (
+          <div className="tr-rise" style={{ ...delay(80), textAlign: 'center' }}>
+            <p style={{ margin: '0 0 0.3rem', fontSize: '1rem', color: '#aaa', fontFamily: 'monospace' }}>équipe gagnante</p>
+            <h2 style={{ margin: 0, fontSize: 'clamp(2.2rem, 8vmin, 4rem)', fontWeight: 'bold', color: winner.color }}>
+              🏆 {winner.name}
+            </h2>
+            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', marginTop: '0.5rem' }}>
+              {state.teams.map(t => (
+                <span key={t.id} style={{ fontFamily: 'monospace', color: t.id === winner.id ? t.color : '#555', fontSize: '1rem' }}>
+                  {t.name} {t.score}
+                </span>
+              ))}
+            </div>
+          </div>
+        )
+      })() : (
+        <h2 className="tr-logo tr-rise" style={{ ...delay(80), fontSize: 'clamp(2rem, 6vmin, 3.6rem)' }}>
+          Résultats finaux
+        </h2>
+      )}
 
       {medals.length === 0 ? (
         <p className="tr-empty">Aucun participant…</p>

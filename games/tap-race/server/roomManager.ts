@@ -1,5 +1,5 @@
 import type { Server } from 'socket.io'
-import { TapRaceRoom } from './tapRaceRoom'
+import { TapRaceRoom, type RoomConfig } from './tapRaceRoom'
 
 const DEFAULT_TIMEOUT_MS = 30 * 60 * 1000
 
@@ -23,14 +23,14 @@ export class RoomManager {
     )
   }
 
-  create(): string {
+  create(config?: RoomConfig): string {
     let code = generateCode()
     while (this.rooms.has(code)) code = generateCode()
     const db = this.db
     const saveResultsFn = db
       ? (players: { name: string; score: number }[]) => db.saveResults(players)
       : () => {}
-    this.rooms.set(code, new TapRaceRoom(this.io, code, saveResultsFn))
+    this.rooms.set(code, new TapRaceRoom(this.io, code, saveResultsFn, config))
     return code
   }
 
@@ -42,7 +42,7 @@ export class RoomManager {
     return [...this.rooms.keys()]
   }
 
-  listWithStatus(): { code: string; phase: string; playerCount: number }[] {
+  listWithStatus(): { code: string; phase: string; playerCount: number; mode: string }[] {
     return [...this.rooms.entries()].map(([code, room]) => ({ code, ...room.getStatus() }))
   }
 

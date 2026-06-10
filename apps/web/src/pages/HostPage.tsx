@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import QRCode from 'qrcode'
 import HostView from '@arcade/tap-race/client/HostView'
-import type { HostViewState, LeaderboardEntry } from '@arcade/tap-race/client/types'
+import type { HostViewState, LeaderboardEntry, TeamScore } from '@arcade/tap-race/client/types'
 import type { Phase } from '@arcade/tap-race/client/game'
 import { socket } from '../socket'
 import NotFoundPage from './NotFoundPage'
@@ -14,6 +14,7 @@ export default function HostPage() {
   const [countdown, setCountdown] = useState(3)
   const [timeLeft, setTimeLeft] = useState(60)
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
+  const [teams, setTeams] = useState<TeamScore[]>([])
   const [qrUrl, setQrUrl] = useState('')
   const [notFound, setNotFound] = useState(false)
 
@@ -30,7 +31,10 @@ export default function HostPage() {
       if (d.countdown !== undefined) setCountdown(d.countdown)
       if (d.timeLeft !== undefined) setTimeLeft(d.timeLeft)
     })
-    socket.on('LEADERBOARD_UPDATE', (d: { players: LeaderboardEntry[] }) => setLeaderboard(d.players))
+    socket.on('LEADERBOARD_UPDATE', (d: { players: LeaderboardEntry[]; teams?: TeamScore[] }) => {
+      setLeaderboard(d.players)
+      if (d.teams) setTeams(d.teams)
+    })
     return () => {
       socket.off('GAME_STATE')
       socket.off('LEADERBOARD_UPDATE')
@@ -40,7 +44,7 @@ export default function HostPage() {
 
   if (notFound) return <NotFoundPage message="Room introuvable ou expirée." />
 
-  const state: HostViewState = { phase, countdown, timeLeft, leaderboard, roomCode: code }
+  const state: HostViewState = { phase, countdown, timeLeft, leaderboard, roomCode: code, teams: teams.length > 0 ? teams : undefined }
 
   return (
     <HostView

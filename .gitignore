@@ -2,3 +2,9 @@ node_modules/
 dist/
 .env
 *.local
+
+# artefacts de session navigateur (Playwright MCP)
+.playwright-mcp/
+
+# données runtime (leaderboard sqlite)
+apps/server/arcade.db

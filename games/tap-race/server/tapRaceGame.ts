@@ -1,9 +1,16 @@
 export type ServerPhase = 'WAITING' | 'COUNTDOWN' | 'PLAYING' | 'RESULTS'
 
+export interface TeamConfig {
+  id: string
+  name: string
+  color: string
+}
+
 export interface PlayerRecord {
   id: string
   name: string
   score: number
+  teamId?: string
 }
 
 export interface ServerGameState {
@@ -16,7 +23,7 @@ export interface ServerGameState {
 export type ServerEvent =
   | { type: 'START' }
   | { type: 'TICK' }
-  | { type: 'PLAYER_JOIN'; id: string; name: string }
+  | { type: 'PLAYER_JOIN'; id: string; name: string; teamId?: string }
   | { type: 'PLAYER_LEAVE'; id: string }
   | { type: 'TAP_BATCH'; playerId: string; count: number }
 
@@ -33,7 +40,7 @@ export function serverReducer(state: ServerGameState, event: ServerEvent): Serve
       if (state.phase === 'RESULTS') return state
       return {
         ...state,
-        players: { ...state.players, [event.id]: { id: event.id, name: event.name, score: 0 } },
+        players: { ...state.players, [event.id]: { id: event.id, name: event.name, score: 0, teamId: event.teamId } },
       }
 
     case 'PLAYER_LEAVE': {
@@ -79,4 +86,13 @@ export function getLeaderboard(state: ServerGameState): PlayerRecord[] {
   return Object.values(state.players)
     .sort((a, b) => b.score - a.score)
     .slice(0, 10)
+}
+
+export function getTeamScores(state: ServerGameState, teams: TeamConfig[]): (TeamConfig & { score: number })[] {
+  return teams.map(team => ({
+    ...team,
+    score: Object.values(state.players)
+      .filter(p => p.teamId === team.id)
+      .reduce((sum, p) => sum + p.score, 0),
+  }))
 }

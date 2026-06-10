@@ -11,8 +11,14 @@ describe('serverReducer', () => {
     expect(next.players['p1']).toEqual({ id: 'p1', name: 'Alice', score: 0 })
   })
 
-  it('PLAYER_JOIN ignoré hors WAITING', () => {
+  it('PLAYER_JOIN accepté en cours de partie (PLAYING)', () => {
     const s = { ...initialServerState, phase: 'PLAYING' as const, timeLeft: 30, players: {} }
+    const next = serverReducer(s, { type: 'PLAYER_JOIN', id: 'p1', name: 'Alice' })
+    expect(next.players['p1']).toEqual({ id: 'p1', name: 'Alice', score: 0 })
+  })
+
+  it('PLAYER_JOIN ignoré en RESULTS', () => {
+    const s = { ...initialServerState, phase: 'RESULTS' as const, players: {} }
     const next = serverReducer(s, { type: 'PLAYER_JOIN', id: 'p1', name: 'Alice' })
     expect(next.players['p1']).toBeUndefined()
   })

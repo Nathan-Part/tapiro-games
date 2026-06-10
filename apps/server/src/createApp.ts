@@ -48,9 +48,14 @@ export function createApp(dbPath = process.env.DB_PATH ?? './arcade.db') {
 
     const roomCheckMatch = req.method === 'GET' && req.url?.match(/^\/api\/rooms\/([A-Z0-9]+)$/)
     if (roomCheckMatch) {
-      const exists = manager.get(roomCheckMatch[1]) !== undefined
-      res.writeHead(exists ? 200 : 404, { 'Content-Type': 'application/json' })
-      res.end(JSON.stringify({ exists }))
+      const room = manager.get(roomCheckMatch[1])
+      if (!room) {
+        res.writeHead(404, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ exists: false, mode: 'solo', teams: [] }))
+      } else {
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ exists: true, ...room.getConfig() }))
+      }
       return
     }
 
@@ -68,9 +73,18 @@ export function createApp(dbPath = process.env.DB_PATH ?? './arcade.db') {
       }
 
       if (req.method === 'POST' && req.url === '/api/admin/rooms') {
-        const code = manager.create()
-        res.writeHead(201, { 'Content-Type': 'application/json' })
-        res.end(JSON.stringify({ code }))
+        const chunks: Buffer[] = []
+        req.on('data', (chunk: Buffer) => chunks.push(chunk))
+        req.on('end', () => {
+          let config: { mode: 'solo' | 'team'; teams: { id: string; name: string; color: string }[] } = { mode: 'solo', teams: [] }
+          try {
+            const body = JSON.parse(Buffer.concat(chunks).toString())
+            if (body.mode === 'team' && Array.isArray(body.teams)) config = { mode: 'team', teams: body.teams }
+          } catch {}
+          const code = manager.create(config)
+          res.writeHead(201, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ code }))
+        })
         return
       }
 
@@ -115,11 +129,11 @@ export function createApp(dbPath = process.env.DB_PATH ?? './arcade.db') {
       socket.emit('ROOM_CREATED', { code })
     })
 
-    socket.on('JOIN_ROOM', (data: { code: string; name: string }) => {
+    socket.on('JOIN_ROOM', (data: { code: string; name: string; teamId?: string }) => {
       for (const r of socket.rooms) { if (r !== socket.id) socket.leave(r) }
       const room = manager.get(data.code?.toUpperCase())
       if (!room) { socket.emit('ERROR', { message: 'Room introuvable' }); return }
-      room.join(socket, data.name ?? 'Anonyme')
+      room.join(socket, data.name ?? 'Anonyme', data.teamId)
     })
 
     socket.on('HOST_ROOM', (data: { code: string }) => {

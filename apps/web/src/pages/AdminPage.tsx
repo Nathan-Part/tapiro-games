@@ -9,11 +9,14 @@ export default function AdminPage() {
   const [loggedIn, setLoggedIn] = useState(false)
   const [password, setPassword] = useState('')
   const [token, setToken] = useState('')
-  const [rooms, setRooms] = useState<{ code: string; phase: string; playerCount: number }[]>([])
+  const [rooms, setRooms] = useState<{ code: string; phase: string; playerCount: number; mode: string }[]>([])
   const [error, setError] = useState('')
   const [creating, setCreating] = useState(false)
   const creatingRef = useRef(false)
   const [copied, setCopied] = useState<string | null>(null)
+  const [showCreateForm, setShowCreateForm] = useState(false)
+  const [newMode, setNewMode] = useState<'solo' | 'team'>('solo')
+  const [teamNames, setTeamNames] = useState(['Équipe Rouge', 'Équipe Bleue'])
 
   useEffect(() => {
     const saved = localStorage.getItem('admin-token')
@@ -27,7 +30,7 @@ export default function AdminPage() {
         headers: { Authorization: `Bearer ${t}` },
       })
       if (res.status === 401) { setError('Mot de passe incorrect'); return }
-      const data = await res.json() as { rooms: { code: string; phase: string; playerCount: number }[] }
+      const data = await res.json() as { rooms: { code: string; phase: string; playerCount: number; mode: string }[] }
       setToken(t)
       setRooms(data.rooms)
       setLoggedIn(true)
@@ -43,7 +46,7 @@ export default function AdminPage() {
         headers: { Authorization: `Bearer ${t}` },
       })
       if (!res.ok) return
-      const data = await res.json() as { rooms: { code: string; phase: string; playerCount: number }[] }
+      const data = await res.json() as { rooms: { code: string; phase: string; playerCount: number; mode: string }[] }
       setRooms(data.rooms)
     } catch {}
   }
@@ -52,16 +55,26 @@ export default function AdminPage() {
     if (creatingRef.current) return
     creatingRef.current = true
     setCreating(true)
+    setShowCreateForm(false)
+    const config = newMode === 'team'
+      ? { mode: 'team' as const, teams: [
+          { id: 'red', name: teamNames[0] || 'Équipe 1', color: '#dc2626' },
+          { id: 'blue', name: teamNames[1] || 'Équipe 2', color: '#2563eb' },
+        ]}
+      : { mode: 'solo' as const, teams: [] }
     try {
       const res = await fetch(`${API}/api/admin/rooms`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(config),
       })
       const data = await res.json() as { code: string }
-      setRooms(prev => [...prev, { code: data.code, phase: 'WAITING', playerCount: 0 }])
+      setRooms(prev => [...prev, { code: data.code, phase: 'WAITING', playerCount: 0, mode: newMode }])
     } finally {
       creatingRef.current = false
       setCreating(false)
+      setNewMode('solo')
+      setTeamNames(['Équipe Rouge', 'Équipe Bleue'])
     }
   }
 
@@ -138,11 +151,45 @@ export default function AdminPage() {
             </h2>
             <div style={{ display: 'flex', gap: '0.5rem' }}>
               <button className="arc-btn arc-btn-ghost arc-btn--sm" onClick={() => loadRooms()}>↻</button>
-              <button className="arc-btn arc-btn-primary arc-btn--sm" onClick={createRoom} disabled={creating}>
+              <button className="arc-btn arc-btn-primary arc-btn--sm" onClick={() => setShowCreateForm(v => !v)} disabled={creating}>
                 {creating ? '…' : '+ Créer'}
               </button>
             </div>
           </div>
+          {showCreateForm && (
+            <div style={s.createForm}>
+              <p className="arc-label" style={{ marginBottom: '0.6rem' }}>Type de partie</p>
+              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                {(['solo', 'team'] as const).map(m => (
+                  <button
+                    key={m}
+                    style={{ ...s.modeBtn, ...(newMode === m ? s.modeBtnActive : {}) }}
+                    onClick={() => setNewMode(m)}
+                  >
+                    {m === 'solo' ? 'Solo' : 'Équipes'}
+                  </button>
+                ))}
+              </div>
+              {newMode === 'team' && (
+                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                  {[0, 1].map(i => (
+                    <input
+                      key={i}
+                      className="arc-input"
+                      style={{ flex: 1, borderLeft: `3px solid ${i === 0 ? '#dc2626' : '#2563eb'}` }}
+                      value={teamNames[i]}
+                      onChange={e => setTeamNames(prev => prev.map((n, j) => j === i ? e.target.value : n))}
+                      placeholder={`Équipe ${i + 1}`}
+                    />
+                  ))}
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button className="arc-btn arc-btn-primary arc-btn--sm" onClick={createRoom}>Créer</button>
+                <button className="arc-btn arc-btn-ghost arc-btn--sm" onClick={() => setShowCreateForm(false)}>Annuler</button>
+              </div>
+            </div>
+          )}
           {rooms.length === 0
             ? <p className="arc-hint" style={{ marginTop: '1.2rem' }}>Aucune room active</p>
             : (
@@ -161,6 +208,7 @@ export default function AdminPage() {
                       {room.phase === 'PLAYING' && `▶ En cours · ${room.playerCount}p`}
                       {room.phase === 'RESULTS' && '✓ Terminée'}
                     </span>
+                    {room.mode === 'team' && <span style={s.badgeTeam}>👥 Équipes</span>}
                     <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginLeft: 'auto' }}>
                       <button
                         className="arc-btn arc-btn-ghost arc-btn--sm"
@@ -211,6 +259,22 @@ const s: Record<string, React.CSSProperties> = {
     fontSize: '0.75rem', padding: '0.2em 0.6em', borderRadius: 99,
     background: 'rgba(255,255,255,0.07)', color: '#888',
     fontFamily: 'monospace', whiteSpace: 'nowrap' as const,
+  },
+  badgeTeam: {
+    fontSize: '0.75rem', padding: '0.2em 0.5em', borderRadius: 99,
+    background: 'rgba(250,204,21,0.1)', color: '#facc15',
+    fontFamily: 'monospace', whiteSpace: 'nowrap' as const,
+  },
+  createForm: {
+    background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
+    borderRadius: 10, padding: '1rem', marginBottom: '0.85rem',
+  },
+  modeBtn: {
+    flex: 1, padding: '0.5rem', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)',
+    background: 'transparent', color: '#888', cursor: 'pointer', fontFamily: 'monospace', fontSize: '0.9rem',
+  },
+  modeBtnActive: {
+    background: 'rgba(0,245,255,0.1)', border: '1px solid rgba(0,245,255,0.4)', color: '#00f5ff',
   },
   badgeLive: {
     background: 'rgba(74,222,128,0.15)', color: '#4ade80',

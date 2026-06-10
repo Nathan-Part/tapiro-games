@@ -102,6 +102,21 @@ function PlayingScreen({ state, onTap }: { state: PlayerViewState; onTap: () => 
         </div>
       </div>
 
+      {state.teams && state.teams.length >= 2 && (
+        <div style={{ display: 'flex', gap: '0.6rem', width: '100%', maxWidth: 340 }}>
+          {state.teams.map(t => (
+            <div key={t.id} style={{
+              flex: 1, textAlign: 'center', padding: '0.4rem 0.6rem', borderRadius: 8,
+              background: t.id === state.teamId ? `${t.color}22` : 'rgba(255,255,255,0.04)',
+              border: `1px solid ${t.id === state.teamId ? t.color : 'rgba(255,255,255,0.1)'}`,
+            }}>
+              <p style={{ margin: 0, fontSize: '0.7rem', color: t.id === state.teamId ? t.color : '#666', fontFamily: 'monospace' }}>{t.name}</p>
+              <p style={{ margin: 0, fontSize: '1.3rem', fontWeight: 'bold', color: t.id === state.teamId ? t.color : '#888' }}>{t.score}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="tr-scorezone">
         <p className="tr-label">Score</p>
         <p ref={scoreRef} className="tr-score">{displayed}</p>
@@ -116,14 +131,24 @@ function PlayingScreen({ state, onTap }: { state: PlayerViewState; onTap: () => 
 
 function ResultsScreen({ state, onViewGlobalLeaderboard }: { state: PlayerViewState; onViewGlobalLeaderboard?: () => void }) {
   const displayed = useCountUp(state.score, 900)
+  const winner = state.teams?.length ? state.teams.reduce((a, b) => a.score >= b.score ? a : b) : null
+  const myTeam = state.teams?.find(t => t.id === state.teamId)
+  const iWin = winner && myTeam && winner.id === myTeam.id
+
   return (
     <div className="tr-screen">
       <div className="tr-ambient" aria-hidden="true" />
       <Confetti />
       <p className="tr-kicker tr-rise">/// course terminée ///</p>
-      <h2 className="tr-logo tr-rise" style={{ ...delay(100), fontSize: 'clamp(1.9rem, 8vw, 2.8rem)' }}>
-        Terminé !
-      </h2>
+      {winner ? (
+        <h2 className="tr-logo tr-rise" style={{ ...delay(100), fontSize: 'clamp(1.6rem, 7vw, 2.4rem)', color: iWin ? winner.color : '#888' }}>
+          {iWin ? `🏆 ${winner.name} gagne !` : `${winner.name} gagne…`}
+        </h2>
+      ) : (
+        <h2 className="tr-logo tr-rise" style={{ ...delay(100), fontSize: 'clamp(1.9rem, 8vw, 2.8rem)' }}>
+          Terminé !
+        </h2>
+      )}
       <p className="tr-final tr-rise" style={delay(250)}>{displayed}</p>
       <p className="tr-label tr-rise" style={delay(400)}>taps</p>
       {onViewGlobalLeaderboard && (

@@ -1,9 +1,17 @@
 import type { Phase } from './game'
 
+export interface TeamScore {
+  id: string
+  name: string
+  color: string
+  score: number
+}
+
 export interface LeaderboardEntry {
   id: string
   name: string
   score: number
+  teamId?: string
 }
 
 export interface PlayerViewState {
@@ -12,7 +20,9 @@ export interface PlayerViewState {
   timeLeft: number
   score: number
   playerName: string
-  waitingPlayers?: { id: string; name: string }[]
+  teamId?: string
+  teams?: TeamScore[]
+  waitingPlayers?: { id: string; name: string; teamId?: string }[]
   totalPlayers?: number
 }
 
@@ -22,4 +32,5 @@ export interface HostViewState {
   timeLeft: number
   leaderboard: LeaderboardEntry[]
   roomCode?: string
+  teams?: TeamScore[]
 }

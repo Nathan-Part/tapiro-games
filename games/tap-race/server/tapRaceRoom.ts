@@ -1,14 +1,20 @@
 import { randomUUID } from 'node:crypto'
 import type { Server, Socket } from 'socket.io'
-import { serverReducer, getLeaderboard, initialServerState, type ServerGameState } from './tapRaceGame'
+import { serverReducer, getLeaderboard, getTeamScores, initialServerState, type ServerGameState, type TeamConfig } from './tapRaceGame'
 import { TapBatchSchema } from '../shared/messages'
 
 type SaveResultsFn = (players: { name: string; score: number }[]) => void
+
+export interface RoomConfig {
+  mode: 'solo' | 'team'
+  teams: TeamConfig[]
+}
 
 interface PlayerSession {
   socketId: string
   name: string
   score: number
+  teamId?: string
 }
 
 export class TapRaceRoom {
@@ -23,19 +29,30 @@ export class TapRaceRoom {
     private readonly io: Server,
     private readonly roomId: string,
     private readonly saveResults: SaveResultsFn = () => {},
+    private readonly config: RoomConfig = { mode: 'solo', teams: [] },
   ) {}
 
-  join(socket: Socket, name: string) {
+  getConfig(): RoomConfig { return this.config }
+
+  getStatus() {
+    return {
+      phase: this.state.phase,
+      playerCount: Object.keys(this.state.players).length,
+      mode: this.config.mode,
+    }
+  }
+
+  join(socket: Socket, name: string, teamId?: string) {
     const token = randomUUID()
-    this.sessions.set(token, { socketId: socket.id, name, score: 0 })
+    this.sessions.set(token, { socketId: socket.id, name, score: 0, teamId })
     this.lastActivity = Date.now()
 
     socket.join(this.roomId)
-    this.state = serverReducer(this.state, { type: 'PLAYER_JOIN', id: socket.id, name })
+    this.state = serverReducer(this.state, { type: 'PLAYER_JOIN', id: socket.id, name, teamId })
 
     socket.emit('JOINED', { token })
     socket.emit('GAME_STATE', { phase: this.state.phase, countdown: this.state.countdown, timeLeft: this.state.timeLeft })
-    this.io.to(this.roomId).emit('LEADERBOARD_UPDATE', { players: getLeaderboard(this.state) })
+    this.emitLeaderboard()
     this.broadcastPlayerList()
 
     this.registerTapHandler(socket)
@@ -46,7 +63,7 @@ export class TapRaceRoom {
         if (currentPlayer) entry[1].score = currentPlayer.score
       }
       this.state = serverReducer(this.state, { type: 'PLAYER_LEAVE', id: socket.id })
-      this.io.to(this.roomId).emit('LEADERBOARD_UPDATE', { players: getLeaderboard(this.state) })
+      this.emitLeaderboard()
       this.broadcastPlayerList()
     })
   }
@@ -63,13 +80,13 @@ export class TapRaceRoom {
       ...this.state,
       players: {
         ...this.state.players,
-        [socket.id]: { id: socket.id, name: session.name, score: session.score },
+        [socket.id]: { id: socket.id, name: session.name, score: session.score, teamId: session.teamId },
       },
     }
 
     socket.emit('GAME_STATE', { phase: this.state.phase, countdown: this.state.countdown, timeLeft: this.state.timeLeft })
     socket.emit('SCORE_UPDATE', { score: session.score })
-    this.io.to(this.roomId).emit('LEADERBOARD_UPDATE', { players: getLeaderboard(this.state) })
+    this.emitLeaderboard()
     this.broadcastPlayerList()
 
     this.registerTapHandler(socket)
@@ -80,7 +97,7 @@ export class TapRaceRoom {
         if (currentPlayer) s.score = currentPlayer.score
       }
       this.state = serverReducer(this.state, { type: 'PLAYER_LEAVE', id: socket.id })
-      this.io.to(this.roomId).emit('LEADERBOARD_UPDATE', { players: getLeaderboard(this.state) })
+      this.emitLeaderboard()
       this.broadcastPlayerList()
     })
 
@@ -94,22 +111,15 @@ export class TapRaceRoom {
       if (currentPlayer) entry[1].score = currentPlayer.score
     }
     this.state = serverReducer(this.state, { type: 'PLAYER_LEAVE', id: socket.id })
-    this.io.to(this.roomId).emit('LEADERBOARD_UPDATE', { players: getLeaderboard(this.state) })
+    this.emitLeaderboard()
     this.broadcastPlayerList()
     socket.leave(this.roomId)
-  }
-
-  getStatus() {
-    return {
-      phase: this.state.phase,
-      playerCount: Object.keys(this.state.players).length,
-    }
   }
 
   watchAsHost(socket: Socket) {
     socket.join(this.roomId)
     socket.emit('GAME_STATE', { phase: this.state.phase, countdown: this.state.countdown, timeLeft: this.state.timeLeft })
-    socket.emit('LEADERBOARD_UPDATE', { players: getLeaderboard(this.state) })
+    socket.emit('LEADERBOARD_UPDATE', this.buildLeaderboardPayload())
   }
 
   start() {
@@ -125,17 +135,14 @@ export class TapRaceRoom {
       this.broadcast()
       if (this.state.phase === 'RESULTS') {
         this.stopIntervals()
-        const leaderboard = getLeaderboard(this.state)
-        this.io.to(this.roomId).emit('LEADERBOARD_UPDATE', { players: leaderboard })
+        this.emitLeaderboard()
         const players = Object.values(this.state.players).map(p => ({ name: p.name, score: p.score }))
         if (players.length > 0) this.saveResults(players)
       }
     }, 1000)
 
     this.leaderboardInterval = setInterval(() => {
-      if (this.state.phase === 'PLAYING') {
-        this.io.to(this.roomId).emit('LEADERBOARD_UPDATE', { players: getLeaderboard(this.state) })
-      }
+      if (this.state.phase === 'PLAYING') this.emitLeaderboard()
     }, 100)
 
     this.scoreInterval = setInterval(() => {
@@ -145,6 +152,20 @@ export class TapRaceRoom {
         }
       }
     }, 200)
+  }
+
+  private buildLeaderboardPayload() {
+    const payload: { players: ReturnType<typeof getLeaderboard>; teams?: ReturnType<typeof getTeamScores> } = {
+      players: getLeaderboard(this.state),
+    }
+    if (this.config.mode === 'team') {
+      payload.teams = getTeamScores(this.state, this.config.teams)
+    }
+    return payload
+  }
+
+  private emitLeaderboard() {
+    this.io.to(this.roomId).emit('LEADERBOARD_UPDATE', this.buildLeaderboardPayload())
   }
 
   private registerTapHandler(socket: Socket) {
@@ -163,7 +184,7 @@ export class TapRaceRoom {
   private broadcastPlayerList() {
     const all = Object.values(this.state.players)
     this.io.to(this.roomId).emit('PLAYERS_UPDATE', {
-      players: all.slice(0, 100).map(p => ({ id: p.id, name: p.name })),
+      players: all.slice(0, 100).map(p => ({ id: p.id, name: p.name, teamId: p.teamId })),
       total: all.length,
     })
   }
