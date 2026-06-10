@@ -107,12 +107,14 @@ export function createApp(dbPath = process.env.DB_PATH ?? './arcade.db') {
     })
 
     socket.on('JOIN_ROOM', (data: { code: string; name: string }) => {
+      for (const r of socket.rooms) { if (r !== socket.id) socket.leave(r) }
       const room = manager.get(data.code?.toUpperCase())
       if (!room) { socket.emit('ERROR', { message: 'Room introuvable' }); return }
       room.join(socket, data.name ?? 'Anonyme')
     })
 
     socket.on('HOST_ROOM', (data: { code: string }) => {
+      for (const r of socket.rooms) { if (r !== socket.id) socket.leave(r) }
       const room = manager.get(data.code?.toUpperCase())
       if (!room) { socket.emit('ERROR', { message: 'Room introuvable' }); return }
       room.watchAsHost(socket)
@@ -123,6 +125,7 @@ export function createApp(dbPath = process.env.DB_PATH ?? './arcade.db') {
     })
 
     socket.on('REJOIN_ROOM', (data: { code: string; token: string }) => {
+      for (const r of socket.rooms) { if (r !== socket.id) socket.leave(r) }
       const room = manager.get(data.code?.toUpperCase())
       if (!room) { socket.emit('ERROR', { message: 'Room introuvable' }); return }
       const ok = room.rejoin(socket, data.token)

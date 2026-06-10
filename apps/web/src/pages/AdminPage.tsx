@@ -1,5 +1,5 @@
 /// <reference types="vite/client" />
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 const API = import.meta.env.VITE_SERVER_URL ?? 'http://localhost:4000'
@@ -12,6 +12,7 @@ export default function AdminPage() {
   const [rooms, setRooms] = useState<string[]>([])
   const [error, setError] = useState('')
   const [creating, setCreating] = useState(false)
+  const creatingRef = useRef(false)
   const [copied, setCopied] = useState<string | null>(null)
 
   useEffect(() => {
@@ -48,6 +49,8 @@ export default function AdminPage() {
   }
 
   async function createRoom() {
+    if (creatingRef.current) return
+    creatingRef.current = true
     setCreating(true)
     try {
       const res = await fetch(`${API}/api/admin/rooms`, {
@@ -57,6 +60,7 @@ export default function AdminPage() {
       const data = await res.json() as { code: string }
       setRooms(prev => [...prev, data.code])
     } finally {
+      creatingRef.current = false
       setCreating(false)
     }
   }

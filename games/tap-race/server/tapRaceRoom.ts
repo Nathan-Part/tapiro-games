@@ -89,6 +89,7 @@ export class TapRaceRoom {
   start() {
     if (this.state.phase === 'RESULTS') { this.state = { ...initialServerState } }
     if (this.state.phase !== 'WAITING') return
+    if (Object.keys(this.state.players).length === 0) return
     this.lastActivity = Date.now()
     this.state = serverReducer(this.state, { type: 'START' })
     this.broadcast()
