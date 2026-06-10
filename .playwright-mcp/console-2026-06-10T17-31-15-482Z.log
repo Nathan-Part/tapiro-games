@@ -1,0 +1,4 @@
+[      67ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:5174/node_modules/.vite/deps/react-dom_client.js?v=5275549a:20102
+[   29880ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:4000/socket.io/?EIO=4&transport=polling&t=cil9rjpu:0
+[   33753ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:4000/socket.io/?EIO=4&transport=polling&t=cio91d67:0
+[   38473ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:4000/socket.io/?EIO=4&transport=polling&t=cirvy6sp:0

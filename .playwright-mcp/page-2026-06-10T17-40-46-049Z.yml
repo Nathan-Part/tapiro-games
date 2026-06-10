@@ -1,0 +1,7 @@
+- generic [ref=e3]:
+  - heading "Tap Race" [level=1] [ref=e4]
+  - paragraph [ref=e5]:
+    - text: "Room :"
+    - strong [ref=e6]: HB2N
+  - textbox "Votre nom" [ref=e7]
+  - button "Rejoindre" [ref=e8] [cursor=pointer]

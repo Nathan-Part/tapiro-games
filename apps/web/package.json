@@ -10,11 +10,15 @@
   },
   "dependencies": {
     "@arcade/shared": "workspace:*",
+    "@arcade/tap-race": "workspace:*",
+    "qrcode": "^1.5.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "react-router-dom": "^7.17.0",
     "socket.io-client": "^4.8.0"
   },
   "devDependencies": {
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.3.0",

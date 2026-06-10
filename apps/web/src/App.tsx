@@ -1,32 +1,16 @@
-import { useEffect, useState } from 'react'
-import { socket } from './socket'
-
-type Status = 'disconnected' | 'connecting' | 'connected'
+import { BrowserRouter, Route, Routes } from 'react-router-dom'
+import LandingPage from './pages/LandingPage'
+import HostPage from './pages/HostPage'
+import PlayerPage from './pages/PlayerPage'
 
 export default function App() {
-  const [status, setStatus] = useState<Status>('disconnected')
-
-  useEffect(() => {
-    setStatus('connecting')
-    socket.connect()
-
-    socket.on('connect', () => setStatus('connected'))
-    socket.on('disconnect', () => setStatus('disconnected'))
-
-    return () => {
-      socket.off('connect')
-      socket.off('disconnect')
-      socket.disconnect()
-    }
-  }, [])
-
   return (
-    <div style={{ fontFamily: 'monospace', padding: '2rem' }}>
-      <h1>Arcade</h1>
-      <p>
-        Serveur :{' '}
-        <strong style={{ color: status === 'connected' ? 'green' : 'red' }}>{status}</strong>
-      </p>
-    </div>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/host/:code" element={<HostPage />} />
+        <Route path="/play/:code" element={<PlayerPage />} />
+      </Routes>
+    </BrowserRouter>
   )
 }

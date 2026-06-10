@@ -5,7 +5,8 @@
     "jsx": "react-jsx",
     "noEmit": true,
     "paths": {
-      "@arcade/shared": ["../../packages/shared/src/index.ts"]
+      "@arcade/shared": ["../../packages/shared/src/index.ts"],
+      "@arcade/tap-race/*": ["../../games/tap-race/*"]
     }
   },
   "include": ["src", "vite.config.ts"]

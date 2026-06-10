@@ -1,0 +1,2 @@
+[      63ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:5174/node_modules/.vite/deps/react-dom_client.js?v=5275549a:20102
+[  105791ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:4000/socket.io/?EIO=4&transport=polling&t=clmwkk48:0
