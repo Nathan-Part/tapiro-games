@@ -19,6 +19,8 @@ interface PlayerStats {
   history: { score: number; playedAt: string }[]
 }
 
+const RANK_COLORS = ['var(--gold)', 'var(--silver)', 'var(--bronze)']
+
 export default function LeaderboardPage() {
   const navigate = useNavigate()
   const [scores, setScores] = useState<ScoreEntry[]>([])
@@ -45,128 +47,143 @@ export default function LeaderboardPage() {
     }
   }
 
-  return (
-    <div style={s.screen}>
-      <button style={s.back} onClick={() => navigate('/')}>← Retour</button>
-      <h1 style={s.title}>Meilleurs scores</h1>
-      <p style={s.subtitle}>Top 20 all-time — Tap Race</p>
-      {loading && <p style={s.msg}>Chargement…</p>}
-      {error && <p style={s.error}>{error}</p>}
-      {!loading && !error && scores.length === 0 && (
-        <p style={s.msg}>Aucun score enregistré pour l'instant.</p>
-      )}
-      {scores.length > 0 && (
-        <ol style={s.list}>
-          {scores.map((entry, i) => (
-            <li key={entry.id} style={s.row} onClick={() => openProfile(entry.name)}>
-              <span style={s.rank}>#{i + 1}</span>
-              <span style={s.name}>{entry.name}</span>
-              <span style={s.score}>{entry.score}</span>
-              <span style={s.date}>{new Date(entry.playedAt).toLocaleDateString('fr-FR')}</span>
-            </li>
-          ))}
-        </ol>
-      )}
+  const best = scores.length > 0 ? scores[0].score : 0
 
-      {/* Popup profil */}
-      {(selected || loadingPlayer) && (
-        <div style={s.overlay} onClick={() => setSelected(null)}>
-          <div style={s.modal} onClick={e => e.stopPropagation()}>
-            {loadingPlayer && <p style={{ color: '#aaa', margin: 0 }}>Chargement…</p>}
-            {selected && (
-              <>
-                <div style={s.modalHeader}>
-                  <h2 style={s.modalName}>{selected.name}</h2>
-                  <button style={s.closeBtn} onClick={() => setSelected(null)}>✕</button>
-                </div>
-                <div style={s.stats}>
-                  <div style={s.stat}>
-                    <span style={s.statVal}>{selected.bestScore}</span>
-                    <span style={s.statLabel}>Meilleur score</span>
+  return (
+    <div className="arc-screen arc-screen--top">
+      <div className="arc-ambient" aria-hidden="true" />
+      <main className="arc-content" style={{ gap: '0.9rem', maxWidth: 640, paddingTop: '1rem' }}>
+        <button className="arc-btn arc-btn-ghost arc-btn--sm arc-rise" style={s.back} onClick={() => navigate('/')}>
+          ← Retour
+        </button>
+        <p className="arc-kicker arc-rise">/// hall of fame ///</p>
+        <h1 className="arc-logo arc-rise" style={{ ...s.title, '--d': '80ms' } as React.CSSProperties}>
+          Meilleurs scores
+        </h1>
+        <p className="arc-hint arc-rise" style={{ '--d': '160ms' } as React.CSSProperties}>
+          Top 20 all-time — Tap Race
+        </p>
+
+        {loading && <div className="arc-spinner" style={{ marginTop: '2rem' }} />}
+        {error && <p className="arc-error">{error}</p>}
+        {!loading && !error && scores.length === 0 && (
+          <p className="arc-hint" style={{ marginTop: '2rem' }}>Aucun score enregistré pour l'instant.</p>
+        )}
+
+        {scores.length > 0 && (
+          <ol style={s.list}>
+            {scores.map((entry, i) => (
+              <li
+                key={entry.id}
+                className="arc-row arc-row--click arc-rise"
+                style={{ ...s.row, '--d': `${200 + i * 50}ms` } as React.CSSProperties}
+                onClick={() => openProfile(entry.name)}
+              >
+                <span style={{ ...s.rank, color: RANK_COLORS[i] ?? 'var(--ink-faint)' }}>
+                  {i + 1 <= 3 ? ['🥇', '🥈', '🥉'][i] : `#${i + 1}`}
+                </span>
+                <span style={s.name}>{entry.name}</span>
+                <span style={s.score}>{entry.score}</span>
+                <span style={s.date}>{new Date(entry.playedAt).toLocaleDateString('fr-FR')}</span>
+                <div style={{ ...s.bar, width: `${best > 0 ? Math.max(4, (entry.score / best) * 100) : 0}%` }} aria-hidden="true" />
+              </li>
+            ))}
+          </ol>
+        )}
+
+        {/* Popup profil */}
+        {(selected || loadingPlayer) && (
+          <div className="arc-overlay" onClick={() => setSelected(null)}>
+            <div className="arc-modal" onClick={e => e.stopPropagation()}>
+              {loadingPlayer && <div className="arc-spinner" style={{ alignSelf: 'center' }} />}
+              {selected && (
+                <>
+                  <div style={s.modalHeader}>
+                    <h2 style={s.modalName}>{selected.name}</h2>
+                    <button className="arc-btn arc-btn-ghost arc-btn--sm" onClick={() => setSelected(null)}>✕</button>
                   </div>
-                  <div style={s.stat}>
-                    <span style={s.statVal}>{selected.gamesPlayed}</span>
-                    <span style={s.statLabel}>Parties jouées</span>
+                  <div style={s.stats}>
+                    <div style={s.stat}>
+                      <span style={s.statVal}>{selected.bestScore}</span>
+                      <span className="arc-label" style={s.statLabel}>Meilleur</span>
+                    </div>
+                    <div style={s.stat}>
+                      <span style={s.statVal}>{selected.gamesPlayed}</span>
+                      <span className="arc-label" style={s.statLabel}>Parties</span>
+                    </div>
+                    <div style={s.stat}>
+                      <span style={s.statVal}>{selected.avgScore}</span>
+                      <span className="arc-label" style={s.statLabel}>Moyenne</span>
+                    </div>
                   </div>
-                  <div style={s.stat}>
-                    <span style={s.statVal}>{selected.avgScore}</span>
-                    <span style={s.statLabel}>Moyenne</span>
-                  </div>
-                </div>
-                <p style={s.histTitle}>Historique</p>
-                <ul style={s.histList}>
-                  {selected.history.map((h, i) => (
-                    <li key={i} style={s.histRow}>
-                      <span style={{ color: '#4ade80', fontWeight: 'bold' }}>{h.score}</span>
-                      <span style={{ color: '#555', fontSize: '0.85rem' }}>
-                        {new Date(h.playedAt).toLocaleDateString('fr-FR')}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </>
-            )}
+                  <p className="arc-label">Historique</p>
+                  <ul style={s.histList}>
+                    {selected.history.map((h, i) => (
+                      <li key={i} style={s.histRow}>
+                        <span style={s.histScore}>{h.score}</span>
+                        <span style={s.histDate}>
+                          {new Date(h.playedAt).toLocaleDateString('fr-FR')}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </main>
     </div>
   )
 }
 
 const s: Record<string, React.CSSProperties> = {
-  screen: {
-    display: 'flex', flexDirection: 'column', alignItems: 'center',
-    minHeight: '100dvh', fontFamily: 'monospace', background: '#0f0f0f',
-    color: '#fff', padding: '2rem', gap: '1rem', boxSizing: 'border-box',
-  },
-  back: {
-    alignSelf: 'flex-start', background: 'transparent', color: '#aaa',
-    border: 'none', fontSize: '1rem', cursor: 'pointer', padding: '0.25rem 0',
-  },
-  title: { fontSize: '2.5rem', margin: 0 },
-  subtitle: { color: '#aaa', margin: 0, fontSize: '1rem' },
-  msg: { color: '#666', fontSize: '1.2rem' },
-  error: { color: '#f87171', fontSize: '1rem' },
+  back: { alignSelf: 'flex-start' },
+  title: { fontSize: 'clamp(1.6rem, 6vw, 2.6rem)', textAlign: 'center' },
   list: {
-    listStyle: 'none', padding: 0, margin: 0, width: '100%', maxWidth: '600px',
-    display: 'flex', flexDirection: 'column', gap: '0.5rem',
+    listStyle: 'none', padding: 0, margin: '1rem 0 0', width: '100%',
+    display: 'flex', flexDirection: 'column', gap: '0.6rem',
   },
-  row: {
-    display: 'flex', alignItems: 'center', gap: '1rem',
-    padding: '0.75rem 1.25rem', background: '#1a1a1a', borderRadius: '0.5rem',
-    cursor: 'pointer',
+  row: { position: 'relative', overflow: 'hidden' },
+  rank: {
+    width: '3rem', textAlign: 'center', fontWeight: 700,
+    fontFamily: 'var(--font-display)', fontSize: '1.05rem', zIndex: 1,
   },
-  rank: { color: '#facc15', width: '3rem', textAlign: 'center', fontWeight: 'bold' },
-  name: { flex: 1, fontSize: '1.2rem' },
-  score: { fontWeight: 'bold', color: '#4ade80', fontSize: '1.4rem', width: '5rem', textAlign: 'right' },
-  date: { color: '#555', fontSize: '0.85rem', width: '6rem', textAlign: 'right' },
-  overlay: {
-    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)',
-    display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100,
+  name: { flex: 1, fontSize: '1.1rem', fontWeight: 600, zIndex: 1 },
+  score: {
+    fontWeight: 700, color: 'var(--cyan)', fontSize: '1.35rem', width: '5rem',
+    textAlign: 'right', fontFamily: 'var(--font-display)',
+    textShadow: '0 0 12px rgba(0, 245, 255, 0.45)', zIndex: 1,
   },
-  modal: {
-    background: '#1a1a1a', borderRadius: 12, padding: '1.5rem',
-    width: '100%', maxWidth: '400px', maxHeight: '80dvh',
-    display: 'flex', flexDirection: 'column', gap: '1rem',
-    boxSizing: 'border-box', overflowY: 'auto',
+  date: { color: 'var(--ink-faint)', fontSize: '0.8rem', width: '6rem', textAlign: 'right', zIndex: 1 },
+  bar: {
+    position: 'absolute', left: 0, bottom: 0, height: '100%',
+    background: 'linear-gradient(90deg, rgba(123, 47, 255, 0.13), rgba(0, 245, 255, 0.07))',
+    borderRight: '1px solid rgba(0, 245, 255, 0.25)',
+    transition: 'width 0.8s var(--ease-out)',
+    pointerEvents: 'none',
   },
   modalHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
-  modalName: { margin: 0, fontSize: '1.5rem', color: '#facc15' },
-  closeBtn: {
-    background: 'transparent', border: 'none', color: '#888',
-    cursor: 'pointer', fontSize: '1.2rem', padding: '0.25rem',
+  modalName: {
+    margin: 0, fontSize: '1.5rem', color: '#fff', fontFamily: 'var(--font-display)',
+    letterSpacing: '0.06em', textShadow: '0 0 16px rgba(0, 245, 255, 0.6)',
   },
   stats: { display: 'flex', gap: '1rem', justifyContent: 'space-around' },
-  stat: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem' },
-  statVal: { fontSize: '1.8rem', fontWeight: 'bold', color: '#4ade80' },
-  statLabel: { fontSize: '0.75rem', color: '#888' },
-  histTitle: { margin: 0, color: '#aaa', fontSize: '0.9rem' },
+  stat: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.3rem' },
+  statVal: {
+    fontSize: '1.9rem', fontWeight: 700, fontFamily: 'var(--font-display)',
+    color: 'var(--cyan)', textShadow: '0 0 14px rgba(0, 245, 255, 0.5)',
+  },
+  statLabel: { fontSize: '0.62rem' },
   histList: {
     listStyle: 'none', padding: 0, margin: 0,
     display: 'flex', flexDirection: 'column', gap: '0.4rem',
   },
   histRow: {
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-    padding: '0.5rem 0.75rem', background: '#0f0f0f', borderRadius: 6,
+    padding: '0.55rem 0.85rem', background: 'rgba(2, 2, 8, 0.6)',
+    border: '1px solid rgba(0, 245, 255, 0.08)', borderRadius: 9,
   },
+  histScore: { color: 'var(--cyan)', fontWeight: 700, fontFamily: 'var(--font-display)' },
+  histDate: { color: 'var(--ink-faint)', fontSize: '0.82rem' },
 }

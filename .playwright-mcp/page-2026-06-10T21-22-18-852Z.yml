@@ -1,0 +1,10 @@
+- main [ref=e4]:
+  - paragraph [ref=e5]: /// multiplayer arcade ///
+  - heading "Tap Race" [level=1] [ref=e6]
+  - paragraph [ref=e7]: 60 secondes. Un bouton. Zéro pitié.
+  - generic [ref=e8]:
+    - paragraph [ref=e9]: Rejoindre une partie
+    - generic [ref=e10]:
+      - textbox "CODE" [ref=e11]
+      - button "Rejoindre" [ref=e12] [cursor=pointer]
+    - paragraph [ref=e13]: Scanne le QR code sur l'écran hôte, ou entre le code de la room.

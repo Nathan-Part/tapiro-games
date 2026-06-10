@@ -1,5 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import ParticleField from '../components/ParticleField'
+
+const delay = (ms: number) => ({ '--d': `${ms}ms` }) as React.CSSProperties
 
 export default function LandingPage() {
   const navigate = useNavigate()
@@ -13,56 +16,55 @@ export default function LandingPage() {
   }
 
   return (
-    <div style={s.screen}>
-      {isAdmin && (
-        <button style={s.adminBtn} onClick={() => navigate('/admin')}>⚙ Admin</button>
-      )}
-      <h1 style={s.title}>Tap Race</h1>
+    <div className="arc-screen">
+      <div className="arc-ambient" aria-hidden="true" />
+      <ParticleField />
 
-      <div style={s.card}>
-        <p style={s.label}>Rejoindre une partie</p>
-        <div style={s.row}>
-          <input
-            placeholder="Code de la room"
-            value={code}
-            onChange={e => setCode(e.target.value.toUpperCase())}
-            onKeyDown={e => e.key === 'Enter' && joinRoom()}
-            maxLength={4}
-            style={s.codeInput}
-          />
-          <button onClick={joinRoom} style={s.joinBtn}>Rejoindre</button>
+      {isAdmin && (
+        <button className="arc-btn arc-btn-ghost arc-btn--sm" style={s.adminBtn} onClick={() => navigate('/admin')}>
+          ⚙ Admin
+        </button>
+      )}
+
+      <main className="arc-content" style={s.content}>
+        <p className="arc-kicker arc-rise">/// multiplayer arcade ///</p>
+        <h1 className="arc-logo arc-logo--breathe arc-rise" style={{ ...delay(100), ...s.logo }}>
+          Tap&nbsp;Race
+        </h1>
+        <p className="arc-hint arc-rise" style={{ ...delay(200), ...s.tagline }}>
+          60 secondes. Un bouton. Zéro pitié.
+        </p>
+
+        <div className="arc-card arc-rise" style={delay(300)}>
+          <p className="arc-label">Rejoindre une partie</p>
+          <div style={s.row}>
+            <input
+              className="arc-input arc-input--code"
+              style={{ flex: 1 }}
+              placeholder="CODE"
+              value={code}
+              onChange={e => setCode(e.target.value.toUpperCase())}
+              onKeyDown={e => e.key === 'Enter' && joinRoom()}
+              maxLength={4}
+              autoCapitalize="characters"
+              autoComplete="off"
+              spellCheck={false}
+            />
+            <button className="arc-btn arc-btn-primary" onClick={joinRoom}>
+              Rejoindre
+            </button>
+          </div>
+          <p className="arc-hint">Scanne le QR code sur l'écran hôte, ou entre le code de la room.</p>
         </div>
-      </div>
+      </main>
     </div>
   )
 }
 
 const s: Record<string, React.CSSProperties> = {
-  screen: {
-    display: 'flex', flexDirection: 'column', alignItems: 'center',
-    justifyContent: 'center', height: '100dvh', gap: '1.5rem',
-    fontFamily: 'monospace', background: '#0f0f0f', color: '#fff',
-  },
-  title: { fontSize: '3rem', margin: 0 },
-  card: {
-    display: 'flex', flexDirection: 'column', gap: '0.75rem',
-    background: '#1a1a1a', padding: '1.5rem', borderRadius: 12,
-    width: '100%', maxWidth: '480px', boxSizing: 'border-box',
-  },
-  label: { margin: 0, color: '#aaa', fontSize: '0.9rem' },
-  row: { display: 'flex', gap: '0.5rem' },
-  codeInput: {
-    flex: 1, minWidth: 0, padding: '0.75rem 1rem', fontSize: '1.3rem', fontFamily: 'monospace',
-    borderRadius: 8, border: '1px solid #333', background: '#0f0f0f', color: '#facc15',
-    textAlign: 'center', letterSpacing: '0.2em', textTransform: 'uppercase',
-  },
-  adminBtn: {
-    position: 'fixed' as const, top: '1rem', right: '1rem',
-    padding: '0.4rem 0.9rem', borderRadius: 6, border: '1px solid #333',
-    background: 'transparent', color: '#888', cursor: 'pointer', fontSize: '0.85rem', fontFamily: 'monospace',
-  },
-  joinBtn: {
-    padding: '0.75rem 1.2rem', borderRadius: 8, border: 'none',
-    background: '#dc2626', color: '#fff', cursor: 'pointer', fontSize: '1rem', fontFamily: 'monospace',
-  },
+  content: { gap: '1.1rem' },
+  logo: { fontSize: 'clamp(2.6rem, 9vw, 5rem)', textAlign: 'center' },
+  tagline: { fontSize: '0.95rem', letterSpacing: '0.06em', marginBottom: '0.8rem' },
+  row: { display: 'flex', gap: '0.6rem', flexWrap: 'wrap' },
+  adminBtn: { position: 'fixed', top: '1rem', right: '1rem', zIndex: 5 },
 }

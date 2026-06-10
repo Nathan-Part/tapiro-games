@@ -1,4 +1,9 @@
+import { useRef } from 'react'
 import type { PlayerViewState } from './types'
+import TapButton from './fx/TapButton'
+import Confetti from './fx/Confetti'
+import { useCountUp } from './fx/useCountUp'
+import './tap-race.css'
 
 interface Props {
   state: PlayerViewState
@@ -6,99 +11,126 @@ interface Props {
   onViewGlobalLeaderboard?: () => void
 }
 
+const GAME_DURATION = 60
+const delay = (ms: number) => ({ '--d': `${ms}ms` }) as React.CSSProperties
+
 export default function PlayerView({ state, onTap, onViewGlobalLeaderboard }: Props) {
   if (state.phase === 'WAITING') {
-    const players = state.waitingPlayers ?? []
-    const total = state.totalPlayers ?? players.length
-    return (
-      <div style={s.screen}>
-        <h2 style={s.title}>Tap Race</h2>
-        <p style={s.label}>En attente du démarrage…</p>
-        <p style={s.name}>{state.playerName}</p>
-        {total > 0 && (
-          <div style={s.lobby}>
-            <p style={s.lobbyCount}>{total} joueur{total > 1 ? 's' : ''} connecté{total > 1 ? 's' : ''}</p>
-            <ul style={s.lobbyList}>
-              {players.map(p => (
-                <li key={p.id} style={{ ...s.lobbyItem, fontWeight: p.name === state.playerName ? 'bold' : 'normal', color: p.name === state.playerName ? '#facc15' : '#ccc' }}>
-                  {p.name}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </div>
-    )
+    return <WaitingScreen state={state} />
   }
 
   if (state.phase === 'COUNTDOWN') {
     return (
-      <div style={s.screen}>
-        <p style={s.label}>Prêt ?</p>
-        <p style={s.huge}>{state.countdown}</p>
+      <div className="tr-screen">
+        <div className="tr-ambient" aria-hidden="true" />
+        <p className="tr-label" style={{ fontSize: '1rem' }}>Prêt ?</p>
+        <div className="tr-count">
+          <span key={state.countdown} className="tr-count__ring" aria-hidden="true" />
+          <p key={`d${state.countdown}`} className="tr-count__digit">{state.countdown}</p>
+        </div>
       </div>
     )
   }
 
   if (state.phase === 'PLAYING') {
-    return (
-      <div style={s.screen}>
-        <p style={s.timer}>{state.timeLeft}s</p>
-        <p style={s.score}>{state.score}</p>
-        <button style={s.tap} onClick={onTap}>TAP</button>
-      </div>
-    )
+    return <PlayingScreen state={state} onTap={onTap} />
+  }
+
+  return <ResultsScreen state={state} onViewGlobalLeaderboard={onViewGlobalLeaderboard} />
+}
+
+function WaitingScreen({ state }: { state: PlayerViewState }) {
+  const players = state.waitingPlayers ?? []
+  const total = state.totalPlayers ?? players.length
+  return (
+    <div className="tr-screen">
+      <div className="tr-ambient" aria-hidden="true" />
+      <h2 className="tr-logo tr-rise" style={{ fontSize: 'clamp(1.7rem, 7vw, 2.4rem)' }}>Tap Race</h2>
+      <div className="tr-standby tr-rise" style={delay(80)} aria-hidden="true" />
+      <p className="tr-label tr-rise" style={delay(140)}>En attente du départ…</p>
+      <p className="tr-playername tr-rise" style={delay(200)}>{state.playerName}</p>
+
+      {total > 0 && (
+        <div className="tr-lobby tr-rise" style={delay(280)}>
+          <p className="tr-lobby__count">
+            {total} joueur{total > 1 ? 's' : ''} connecté{total > 1 ? 's' : ''}
+          </p>
+          <ul className="tr-lobby__list">
+            {players.map((p, i) => (
+              <li
+                key={p.id}
+                className={`tr-chip${p.name === state.playerName ? ' tr-chip--me' : ''}`}
+                style={{ animationDelay: `${Math.min(i * 40, 600)}ms` }}
+              >
+                {p.name}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      <p className="tr-hint tr-rise" style={delay(360)}>Échauffe ton pouce. Ça va taper fort.</p>
+    </div>
+  )
+}
+
+function PlayingScreen({ state, onTap }: { state: PlayerViewState; onTap: () => void }) {
+  const scoreRef = useRef<HTMLParagraphElement>(null)
+  const displayed = useCountUp(state.score)
+  const danger = state.timeLeft <= 10
+
+  function handleTap() {
+    onTap()
+    const el = scoreRef.current
+    if (el) {
+      el.classList.remove('tr-score--pop')
+      void el.offsetWidth
+      el.classList.add('tr-score--pop')
+    }
   }
 
   return (
-    <div style={s.screen}>
-      <h2 style={s.title}>Terminé !</h2>
-      <p style={s.huge}>{state.score}</p>
-      <p style={s.label}>taps</p>
+    <div className="tr-screen" data-danger={danger ? 'true' : 'false'} style={{ justifyContent: 'space-between' }}>
+      <div className={`tr-ambient${danger ? ' tr-ambient--danger' : ''}`} aria-hidden="true" />
+
+      <div className="tr-timerzone" style={{ paddingTop: '0.4rem' }}>
+        <p className="tr-timer">{state.timeLeft}s</p>
+        <div className="tr-timerbar">
+          <div
+            className="tr-timerbar__fill"
+            style={{ width: `${Math.max(0, Math.min(100, (state.timeLeft / GAME_DURATION) * 100))}%` }}
+          />
+        </div>
+      </div>
+
+      <div className="tr-scorezone">
+        <p className="tr-label">Score</p>
+        <p ref={scoreRef} className="tr-score">{displayed}</p>
+      </div>
+
+      <div style={{ paddingBottom: '1.2rem' }}>
+        <TapButton onTap={handleTap} />
+      </div>
+    </div>
+  )
+}
+
+function ResultsScreen({ state, onViewGlobalLeaderboard }: { state: PlayerViewState; onViewGlobalLeaderboard?: () => void }) {
+  const displayed = useCountUp(state.score, 900)
+  return (
+    <div className="tr-screen">
+      <div className="tr-ambient" aria-hidden="true" />
+      <Confetti />
+      <p className="tr-kicker tr-rise">/// course terminée ///</p>
+      <h2 className="tr-logo tr-rise" style={{ ...delay(100), fontSize: 'clamp(1.9rem, 8vw, 2.8rem)' }}>
+        Terminé !
+      </h2>
+      <p className="tr-final tr-rise" style={delay(250)}>{displayed}</p>
+      <p className="tr-label tr-rise" style={delay(400)}>taps</p>
       {onViewGlobalLeaderboard && (
-        <button style={s.globalBtn} onClick={onViewGlobalLeaderboard}>
+        <button className="tr-ghostbtn tr-rise" style={delay(550)} onClick={onViewGlobalLeaderboard}>
           Voir score global
         </button>
       )}
     </div>
   )
-}
-
-const s: Record<string, React.CSSProperties> = {
-  screen: {
-    display: 'flex', flexDirection: 'column', alignItems: 'center',
-    justifyContent: 'center', height: '100dvh', fontFamily: 'monospace',
-    gap: '1rem', padding: '1rem', background: '#0f0f0f', color: '#fff',
-    boxSizing: 'border-box',
-  },
-  title: { fontSize: '1.8rem', margin: 0 },
-  label: { fontSize: '1.1rem', color: '#aaa', margin: 0 },
-  name: { fontSize: '1.5rem', fontWeight: 'bold', color: '#60a5fa', margin: 0 },
-  huge: { fontSize: '7rem', fontWeight: 'bold', margin: 0, lineHeight: 1 },
-  score: { fontSize: '4rem', fontWeight: 'bold', margin: 0 },
-  timer: { fontSize: '1.5rem', color: '#aaa', margin: 0 },
-  tap: {
-    width: '80vw', maxWidth: '380px', height: '42vh', fontSize: '3.5rem',
-    fontWeight: 'bold', borderRadius: '2rem', border: 'none',
-    background: '#dc2626', color: '#fff', cursor: 'pointer',
-    touchAction: 'manipulation', userSelect: 'none',
-    boxShadow: '0 8px 32px rgba(220,38,38,0.4)',
-  },
-  lobby: {
-    width: '100%', maxWidth: '320px', background: '#1a1a1a',
-    borderRadius: 10, padding: '0.75rem 1rem',
-    display: 'flex', flexDirection: 'column', gap: '0.5rem',
-  },
-  lobbyCount: { margin: 0, fontSize: '0.8rem', color: '#888', textAlign: 'center' as const },
-  lobbyList: {
-    listStyle: 'none', padding: 0, margin: 0,
-    display: 'flex', flexDirection: 'column', gap: '0.3rem',
-    maxHeight: '40vh', overflowY: 'auto' as const,
-  },
-  lobbyItem: { fontSize: '1rem', padding: '0.2rem 0.4rem' },
-  globalBtn: {
-    padding: '0.75rem 2rem', fontSize: '1rem', borderRadius: '0.5rem',
-    border: '1px solid #4ade80', background: 'transparent', color: '#4ade80',
-    cursor: 'pointer', marginTop: '0.5rem',
-  },
 }

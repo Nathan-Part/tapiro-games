@@ -115,3 +115,4 @@ Permet à Claude de piloter un vrai navigateur : vérifier visuellement les deux
 |---------|------|-----------------|
 | 1 | 2026-06-10 | Setup initial du projet, rédaction CLAUDE.md |
 | 2 | 2026-06-10 | Brainstorming complet — stack, architecture, scalabilité, design system. Toutes les décisions fondatrices actées. Spec rédigée. |
+| 3 | 2026-06-11 | Refonte UI complète « arcade cyberpunk » (logique intacte) : design system `apps/web/src/theme.css` (préfixe `arc-`), styles jeu `games/tap-race/client/tap-race.css` (préfixe `tr-`), FX `games/tap-race/client/fx/` (TapButton ripple/+1 impératifs, Confetti canvas, useCountUp). Particules canvas sur les pages d'accueil/join. Fonts Orbitron + DM Sans + Share Tech Mono. Vérifié en jeu réel via Playwright (countdown, classement live, podium, mode danger). |

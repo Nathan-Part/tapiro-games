@@ -1,4 +1,7 @@
 import type { HostViewState, LeaderboardEntry } from './types'
+import Confetti from './fx/Confetti'
+import { useCountUp } from './fx/useCountUp'
+import './tap-race.css'
 
 interface Props {
   state: HostViewState
@@ -7,114 +10,204 @@ interface Props {
   onViewGlobalLeaderboard?: () => void
 }
 
+const GAME_DURATION = 60
+const ROW_HEIGHT = 60
+const ROW_STEP = 72
+const delay = (ms: number) => ({ '--d': `${ms}ms` }) as React.CSSProperties
+
 export default function HostView({ state, qrUrl, onStart, onViewGlobalLeaderboard }: Props) {
+  if (state.phase === 'WAITING') {
+    return <WaitingScreen state={state} qrUrl={qrUrl} onStart={onStart} />
+  }
+  if (state.phase === 'COUNTDOWN') {
+    return <CountdownScreen state={state} />
+  }
+  if (state.phase === 'PLAYING') {
+    return <PlayingScreen state={state} />
+  }
+  return <ResultsScreen state={state} onViewGlobalLeaderboard={onViewGlobalLeaderboard} />
+}
+
+/* ---------- WAITING : QR géant + lobby ---------- */
+
+function WaitingScreen({ state, qrUrl, onStart }: { state: HostViewState; qrUrl?: string; onStart?: () => void }) {
+  const players = state.leaderboard
   return (
-    <div style={s.screen}>
-      <Header state={state} onStart={onStart} onViewGlobalLeaderboard={onViewGlobalLeaderboard} />
-      <Leaderboard entries={state.leaderboard} />
-      {state.phase === 'WAITING' && qrUrl && (
-        <div style={s.qrWrapper}>
-          <img src={qrUrl} alt="QR code" width={220} height={220} style={s.qrImg} />
-          <p style={s.qrCode}>{state.roomCode}</p>
-          <p style={s.qrLabel}>scannez pour rejoindre</p>
+    <div className="tr-screen tr-screen--host" style={{ justifyContent: 'center', gap: '1.3rem' }}>
+      <div className="tr-ambient" aria-hidden="true" />
+      <div className="tr-gridfloor" aria-hidden="true" />
+
+      <p className="tr-kicker tr-rise">/// scan &amp; play ///</p>
+      <h1 className="tr-logo tr-logo--breathe tr-rise" style={{ ...delay(80), fontSize: 'clamp(2.6rem, 8vmin, 5.2rem)' }}>
+        Tap&nbsp;Race
+      </h1>
+
+      {qrUrl && (
+        <div className="tr-qr tr-rise" style={delay(180)}>
+          <img className="tr-qr__img" src={qrUrl} alt="QR code" />
+          <p className="tr-qr__code">{state.roomCode}</p>
+          <p className="tr-qr__label">scannez pour rejoindre</p>
+        </div>
+      )}
+
+      {onStart && (
+        <button className="tr-start tr-rise" style={delay(280)} onClick={onStart}>
+          Démarrer la partie
+        </button>
+      )}
+
+      {players.length === 0 ? (
+        <p className="tr-empty tr-rise" style={delay(360)}>En attente de joueurs…</p>
+      ) : (
+        <div className="tr-lobby tr-lobby--host tr-rise" style={delay(360)}>
+          <p className="tr-lobby__count">
+            {players.length} joueur{players.length > 1 ? 's' : ''} connecté{players.length > 1 ? 's' : ''}
+          </p>
+          <ul className="tr-lobby__list">
+            {players.map((p, i) => (
+              <li key={p.id} className="tr-chip" style={{ animationDelay: `${Math.min(i * 40, 600)}ms` }}>
+                {p.name}
+              </li>
+            ))}
+          </ul>
         </div>
       )}
     </div>
   )
 }
 
-function Header({ state, onStart, onViewGlobalLeaderboard }: { state: HostViewState; onStart?: () => void; onViewGlobalLeaderboard?: () => void }) {
-  if (state.phase === 'WAITING') {
-    return (
-      <div style={s.header}>
-        <h1 style={s.gameTitle}>Tap Race</h1>
-        {onStart && (
-          <button style={s.startBtn} onClick={onStart}>
-            Démarrer la partie
-          </button>
-        )}
-      </div>
-    )
-  }
-  if (state.phase === 'COUNTDOWN') {
-    return (
-      <div style={s.header}>
-        <p style={s.phaseLabel}>Prêt ?</p>
-        <p style={s.countdown}>{state.countdown}</p>
-      </div>
-    )
-  }
-  if (state.phase === 'PLAYING') {
-    return (
-      <div style={s.header}>
-        <p style={s.timerBig}>{state.timeLeft}s</p>
-        <p style={s.phaseLabel}>EN JEU</p>
-      </div>
-    )
-  }
+/* ---------- COUNTDOWN : chiffre explosif ---------- */
+
+function CountdownScreen({ state }: { state: HostViewState }) {
   return (
-    <div style={s.header}>
-      <h2 style={s.gameTitle}>Résultats finaux</h2>
+    <div className="tr-screen">
+      <div className="tr-ambient" aria-hidden="true" />
+      <p className="tr-label" style={{ fontSize: '1.3rem' }}>Prêt ?</p>
+      <div className="tr-count">
+        <span key={state.countdown} className="tr-count__ring" aria-hidden="true" />
+        <p key={`d${state.countdown}`} className="tr-count__digit">{state.countdown}</p>
+      </div>
+      <p className="tr-hint" style={{ fontSize: '1rem' }}>
+        {state.leaderboard.length} joueur{state.leaderboard.length > 1 ? 's' : ''} sur la grille de départ
+      </p>
+    </div>
+  )
+}
+
+/* ---------- PLAYING : timer géant + classement live ---------- */
+
+function PlayingScreen({ state }: { state: HostViewState }) {
+  const danger = state.timeLeft <= 10
+  return (
+    <div className="tr-screen tr-screen--host" data-danger={danger ? 'true' : 'false'}>
+      <div className={`tr-ambient${danger ? ' tr-ambient--danger' : ''}`} aria-hidden="true" />
+
+      <div className="tr-timerzone" style={{ maxWidth: 700 }}>
+        <p className="tr-htimer">{state.timeLeft}s</p>
+        <div className="tr-timerbar" style={{ height: 9 }}>
+          <div
+            className="tr-timerbar__fill"
+            style={{ width: `${Math.max(0, Math.min(100, (state.timeLeft / GAME_DURATION) * 100))}%` }}
+          />
+        </div>
+        <p className="tr-live">En jeu</p>
+      </div>
+
+      <RankedBoard entries={state.leaderboard} />
+    </div>
+  )
+}
+
+function RankedBoard({ entries }: { entries: LeaderboardEntry[] }) {
+  if (entries.length === 0) {
+    return <p className="tr-empty">En attente de joueurs…</p>
+  }
+  const max = Math.max(1, ...entries.map(e => e.score))
+  return (
+    <div className="tr-board" style={{ height: entries.length * ROW_STEP - (ROW_STEP - ROW_HEIGHT) }}>
+      {entries.map((e, i) => (
+        <div
+          key={e.id}
+          className={`tr-boardrow${i === 0 && e.score > 0 ? ' tr-boardrow--lead' : ''}`}
+          style={{ transform: `translateY(${i * ROW_STEP}px)` }}
+        >
+          <div className="tr-boardrow__bar" style={{ width: `${(e.score / max) * 100}%` }} aria-hidden="true" />
+          <span className={`tr-rank${i < 3 ? ` tr-rank--${i + 1}` : ''}`}>{i + 1}</span>
+          <span className="tr-boardrow__name">{e.name}</span>
+          <AnimatedScore value={e.score} />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function AnimatedScore({ value }: { value: number }) {
+  const displayed = useCountUp(value, 280)
+  return <span className="tr-boardrow__score">{displayed}</span>
+}
+
+/* ---------- RESULTS : podium + confettis ---------- */
+
+const PODIUM_HEIGHTS = ['clamp(160px, 26vh, 240px)', 'clamp(110px, 18vh, 170px)', 'clamp(85px, 14vh, 135px)']
+const PODIUM_DELAYS = [850, 450, 100]
+
+function ResultsScreen({ state, onViewGlobalLeaderboard }: { state: HostViewState; onViewGlobalLeaderboard?: () => void }) {
+  const medals = state.leaderboard.slice(0, 3)
+  const rest = state.leaderboard.slice(3)
+  // ordre d'affichage scénique : 2e — 1er — 3e
+  const slots = [medals[1], medals[0], medals[2]]
+  const ranks = [2, 1, 3]
+
+  return (
+    <div className="tr-screen tr-screen--host" style={{ justifyContent: 'center' }}>
+      <div className="tr-ambient" aria-hidden="true" />
+      <div className="tr-gridfloor" aria-hidden="true" />
+      <Confetti delay={1100} />
+
+      <p className="tr-kicker tr-rise">/// course terminée ///</p>
+      <h2 className="tr-logo tr-rise" style={{ ...delay(80), fontSize: 'clamp(2rem, 6vmin, 3.6rem)' }}>
+        Résultats finaux
+      </h2>
+
+      {medals.length === 0 ? (
+        <p className="tr-empty">Aucun participant…</p>
+      ) : (
+        <div className="tr-podium">
+          {slots.map((entry, i) =>
+            entry ? (
+              <div
+                key={entry.id}
+                className={`tr-podium__slot tr-podium__slot--${ranks[i]}`}
+                style={delay(PODIUM_DELAYS[i])}
+              >
+                <p className="tr-podium__name">{entry.name}</p>
+                <p className="tr-podium__score">{entry.score}</p>
+                <div className="tr-podium__col" style={{ height: PODIUM_HEIGHTS[ranks[i] - 1] }}>
+                  {ranks[i]}
+                </div>
+              </div>
+            ) : null,
+          )}
+        </div>
+      )}
+
+      {rest.length > 0 && (
+        <ol className="tr-resultlist">
+          {rest.map((e, i) => (
+            <li key={e.id} className="tr-resultrow" style={delay(1100 + i * 90)}>
+              <span className="tr-rank">{i + 4}</span>
+              <span className="tr-resultrow__name">{e.name}</span>
+              <span className="tr-resultrow__score">{e.score}</span>
+            </li>
+          ))}
+        </ol>
+      )}
+
       {onViewGlobalLeaderboard && (
-        <button style={s.globalBtn} onClick={onViewGlobalLeaderboard}>
+        <button className="tr-ghostbtn tr-rise" style={delay(1400)} onClick={onViewGlobalLeaderboard}>
           Voir score global
         </button>
       )}
     </div>
   )
-}
-
-function Leaderboard({ entries }: { entries: LeaderboardEntry[] }) {
-  if (entries.length === 0) return <p style={s.empty}>En attente de joueurs…</p>
-  return (
-    <ol style={s.list}>
-      {entries.map((e, i) => (
-        <li key={e.id} style={s.row}>
-          <span style={s.rank}>#{i + 1}</span>
-          <span style={s.pName}>{e.name}</span>
-          <span style={s.pScore}>{e.score}</span>
-        </li>
-      ))}
-    </ol>
-  )
-}
-
-const s: Record<string, React.CSSProperties> = {
-  screen: {
-    display: 'flex', flexDirection: 'column', alignItems: 'center',
-    minHeight: '100dvh', fontFamily: 'monospace', background: '#0f0f0f',
-    color: '#fff', padding: '2rem', gap: '2rem', boxSizing: 'border-box',
-  },
-  header: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' },
-  gameTitle: { fontSize: '3rem', margin: 0 },
-  phaseLabel: { fontSize: '1.5rem', color: '#aaa', margin: 0, textTransform: 'uppercase' },
-  countdown: { fontSize: '10rem', fontWeight: 'bold', margin: 0, lineHeight: 1, color: '#facc15' },
-  timerBig: { fontSize: '5rem', fontWeight: 'bold', margin: 0, color: '#4ade80' },
-  startBtn: {
-    padding: '1rem 3rem', fontSize: '1.5rem', borderRadius: '0.75rem',
-    border: 'none', background: '#2563eb', color: '#fff', cursor: 'pointer',
-  },
-  empty: { color: '#666', fontSize: '1.2rem' },
-  list: {
-    listStyle: 'none', padding: 0, margin: 0, width: '100%', maxWidth: '800px',
-    display: 'flex', flexDirection: 'column', gap: '0.75rem',
-  },
-  row: {
-    display: 'flex', alignItems: 'center', gap: '1rem',
-    padding: '1rem 1.5rem', background: '#1a1a1a', borderRadius: '0.75rem', fontSize: '1.5rem',
-  },
-  rank: { color: '#facc15', width: '3rem', textAlign: 'center', fontWeight: 'bold' },
-  pName: { flex: 1 },
-  pScore: { fontWeight: 'bold', color: '#4ade80', fontSize: '1.8rem' },
-  qrWrapper: {
-    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.4rem',
-  },
-  qrImg: { borderRadius: 12, display: 'block' },
-  qrCode: { margin: 0, fontFamily: 'monospace', fontWeight: 'bold', fontSize: '1.8rem', color: '#facc15', letterSpacing: '0.2em' },
-  qrLabel: { margin: 0, color: '#666', fontSize: '0.8rem', letterSpacing: '0.05em' },
-  globalBtn: {
-    padding: '1rem 2.5rem', fontSize: '1.2rem', borderRadius: '0.5rem',
-    border: '1px solid #4ade80', background: 'transparent', color: '#4ade80',
-    cursor: 'pointer',
-  },
 }

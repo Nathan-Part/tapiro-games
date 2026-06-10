@@ -42,6 +42,10 @@ export class RoomManager {
     return [...this.rooms.keys()]
   }
 
+  listWithStatus(): { code: string; phase: string; playerCount: number }[] {
+    return [...this.rooms.entries()].map(([code, room]) => ({ code, ...room.getStatus() }))
+  }
+
   delete(code: string): boolean {
     return this.rooms.delete(code)
   }

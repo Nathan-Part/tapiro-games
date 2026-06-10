@@ -36,6 +36,7 @@ export class TapRaceRoom {
     socket.emit('JOINED', { token })
     socket.emit('GAME_STATE', { phase: this.state.phase, countdown: this.state.countdown, timeLeft: this.state.timeLeft })
     this.io.to(this.roomId).emit('LEADERBOARD_UPDATE', { players: getLeaderboard(this.state) })
+    this.broadcastPlayerList()
 
     this.registerTapHandler(socket)
     socket.on('disconnect', () => {
@@ -46,6 +47,7 @@ export class TapRaceRoom {
       }
       this.state = serverReducer(this.state, { type: 'PLAYER_LEAVE', id: socket.id })
       this.io.to(this.roomId).emit('LEADERBOARD_UPDATE', { players: getLeaderboard(this.state) })
+      this.broadcastPlayerList()
     })
   }
 
@@ -68,6 +70,7 @@ export class TapRaceRoom {
     socket.emit('GAME_STATE', { phase: this.state.phase, countdown: this.state.countdown, timeLeft: this.state.timeLeft })
     socket.emit('SCORE_UPDATE', { score: session.score })
     this.io.to(this.roomId).emit('LEADERBOARD_UPDATE', { players: getLeaderboard(this.state) })
+    this.broadcastPlayerList()
 
     this.registerTapHandler(socket)
     socket.on('disconnect', () => {
@@ -78,6 +81,7 @@ export class TapRaceRoom {
       }
       this.state = serverReducer(this.state, { type: 'PLAYER_LEAVE', id: socket.id })
       this.io.to(this.roomId).emit('LEADERBOARD_UPDATE', { players: getLeaderboard(this.state) })
+      this.broadcastPlayerList()
     })
 
     return true
@@ -91,7 +95,15 @@ export class TapRaceRoom {
     }
     this.state = serverReducer(this.state, { type: 'PLAYER_LEAVE', id: socket.id })
     this.io.to(this.roomId).emit('LEADERBOARD_UPDATE', { players: getLeaderboard(this.state) })
+    this.broadcastPlayerList()
     socket.leave(this.roomId)
+  }
+
+  getStatus() {
+    return {
+      phase: this.state.phase,
+      playerCount: Object.keys(this.state.players).length,
+    }
   }
 
   watchAsHost(socket: Socket) {
@@ -146,6 +158,14 @@ export class TapRaceRoom {
 
   private broadcast() {
     this.io.to(this.roomId).emit('GAME_STATE', { phase: this.state.phase, countdown: this.state.countdown, timeLeft: this.state.timeLeft })
+  }
+
+  private broadcastPlayerList() {
+    const all = Object.values(this.state.players)
+    this.io.to(this.roomId).emit('PLAYERS_UPDATE', {
+      players: all.slice(0, 100).map(p => ({ id: p.id, name: p.name })),
+      total: all.length,
+    })
   }
 
   private stopIntervals() {

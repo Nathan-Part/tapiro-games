@@ -1,0 +1,12 @@
+- generic [ref=e11]:
+  - heading "Tap Race" [level=2] [ref=e12]
+  - paragraph [ref=e14]: En attente du départ…
+  - paragraph [ref=e15]: NEO
+  - generic [ref=e17]:
+    - paragraph [ref=e18]: 4 joueurs connectés
+    - list [ref=e19]:
+      - listitem [ref=e20]: NEO
+      - listitem [ref=e21]: VEGA
+      - listitem [ref=e22]: KIRA-7
+      - listitem [ref=e23]: JOLT
+  - paragraph [ref=e16]: Échauffe ton pouce. Ça va taper fort.

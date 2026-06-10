@@ -12,6 +12,8 @@ export interface PlayerViewState {
   timeLeft: number
   score: number
   playerName: string
+  waitingPlayers?: { id: string; name: string }[]
+  totalPlayers?: number
 }
 
 export interface HostViewState {

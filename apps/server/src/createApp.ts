@@ -63,7 +63,7 @@ export function createApp(dbPath = process.env.DB_PATH ?? './arcade.db') {
 
       if (req.method === 'GET' && req.url === '/api/admin/rooms') {
         res.writeHead(200, { 'Content-Type': 'application/json' })
-        res.end(JSON.stringify({ rooms: manager.list() }))
+        res.end(JSON.stringify({ rooms: manager.listWithStatus() }))
         return
       }
 
