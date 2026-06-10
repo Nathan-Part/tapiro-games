@@ -4,6 +4,56 @@ import type { Server as HttpServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { createApp } from './createApp'
 
+describe('Admin API', () => {
+  let server: ReturnType<typeof createApp>['httpServer']
+  let baseUrl: string
+  const TOKEN = 'test-admin-token'
+
+  beforeAll(async () => {
+    process.env.ADMIN_TOKEN = TOKEN
+    const app = createApp(':memory:')
+    server = app.httpServer
+    await new Promise<void>((resolve) => server.listen(0, resolve))
+    const addr = server.address() as AddressInfo
+    baseUrl = `http://localhost:${addr.port}`
+  })
+
+  afterAll(() => {
+    server.close()
+    delete process.env.ADMIN_TOKEN
+  })
+
+  it('GET /api/admin/rooms returns 401 without token', async () => {
+    const res = await fetch(`${baseUrl}/api/admin/rooms`)
+    expect(res.status).toBe(401)
+  })
+
+  it('GET /api/admin/rooms returns 200 with valid token', async () => {
+    const res = await fetch(`${baseUrl}/api/admin/rooms`, {
+      headers: { Authorization: `Bearer ${TOKEN}` },
+    })
+    expect(res.status).toBe(200)
+    const body = await res.json() as { rooms: string[] }
+    expect(Array.isArray(body.rooms)).toBe(true)
+  })
+
+  it('POST /api/admin/rooms creates a room and returns 201', async () => {
+    const res = await fetch(`${baseUrl}/api/admin/rooms`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${TOKEN}` },
+    })
+    expect(res.status).toBe(201)
+    const body = await res.json() as { code: string }
+    expect(typeof body.code).toBe('string')
+    expect(body.code.length).toBe(4)
+  })
+
+  it('POST /api/admin/rooms returns 401 without token', async () => {
+    const res = await fetch(`${baseUrl}/api/admin/rooms`, { method: 'POST' })
+    expect(res.status).toBe(401)
+  })
+})
+
 describe('createApp', () => {
   let httpServer: HttpServer
   let port: number

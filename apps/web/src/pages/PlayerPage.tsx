@@ -16,6 +16,7 @@ export default function PlayerPage() {
   const [countdown, setCountdown] = useState(3)
   const [timeLeft, setTimeLeft] = useState(60)
   const [score, setScore] = useState(0)
+  const [errorMsg, setErrorMsg] = useState('')
   const tapBuffer = useRef(0)
 
   // Auto-rejoin if token exists for this room
@@ -29,13 +30,18 @@ export default function PlayerPage() {
     }
     const onError = () => {
       localStorage.removeItem(storageKey(code))
+      setJoined(false)
+    }
+    const onGameState = () => {
+      setJoined(true)
     }
     socket.once('connect', onConnect)
     socket.once('ERROR', onError)
-    setJoined(true)
+    socket.once('GAME_STATE', onGameState)
     return () => {
       socket.off('connect', onConnect)
       socket.off('ERROR', onError)
+      socket.off('GAME_STATE', onGameState)
     }
   }, [code])
 
@@ -66,11 +72,17 @@ export default function PlayerPage() {
   }, [joined, code])
 
   function join() {
+    setErrorMsg('')
     socket.connect()
     socket.once('connect', () => {
       socket.emit('JOIN_ROOM', { code: code?.toUpperCase(), name: name || 'Anonyme' })
     })
-    setJoined(true)
+    socket.once('ERROR', (d: { message: string }) => {
+      setErrorMsg(d.message ?? 'Room introuvable')
+    })
+    socket.once('JOINED', () => {
+      setJoined(true)
+    })
   }
 
   if (!joined) {
@@ -85,6 +97,14 @@ export default function PlayerPage() {
           style={{ padding: '0.75rem 2rem', fontSize: '1.1rem', borderRadius: 8, border: 'none', background: '#dc2626', color: '#fff', cursor: 'pointer' }}>
           Rejoindre
         </button>
+        {errorMsg && (
+          <div style={{ color: '#f87171', fontSize: '1rem', textAlign: 'center' }}>
+            <p style={{ margin: '0 0 0.5rem' }}>{errorMsg}</p>
+            <button onClick={() => navigate('/')} style={{ background: 'transparent', border: 'none', color: '#aaa', cursor: 'pointer', fontSize: '0.9rem', textDecoration: 'underline' }}>
+              ← Retour à l'accueil
+            </button>
+          </div>
+        )}
       </div>
     )
   }

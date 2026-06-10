@@ -38,6 +38,14 @@ export class RoomManager {
     return this.rooms.get(code)
   }
 
+  list(): string[] {
+    return [...this.rooms.keys()]
+  }
+
+  delete(code: string): boolean {
+    return this.rooms.delete(code)
+  }
+
   destroy() {
     clearInterval(this.cleanupInterval)
   }

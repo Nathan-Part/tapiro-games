@@ -2,14 +2,33 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { Server } from 'socket.io'
 import { RoomManager } from '@arcade/tap-race/server/roomManager'
 import { createDb, getTopScores, saveResults } from './db'
+import { createRedisAdapter } from './redisAdapter'
 
 export function createApp(dbPath = process.env.DB_PATH ?? './arcade.db') {
   const db = createDb(dbPath)
+  let manager: RoomManager
+
+  function isAdminAuthorized(req: IncomingMessage): boolean {
+    const token = process.env.ADMIN_TOKEN
+    if (!token) return false
+    return req.headers['authorization'] === `Bearer ${token}`
+  }
+
   const httpServer = createServer((req: IncomingMessage, res: ServerResponse) => {
+    res.setHeader('Access-Control-Allow-Origin', '*')
+    res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type')
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS')
+
+    if (req.method === 'OPTIONS') {
+      res.writeHead(204)
+      res.end()
+      return
+    }
+
     if (req.method === 'GET' && req.url === '/api/leaderboard') {
       try {
         const scores = getTopScores(db)
-        res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' })
+        res.writeHead(200, { 'Content-Type': 'application/json' })
         res.end(JSON.stringify(scores))
       } catch {
         res.writeHead(500, { 'Content-Type': 'text/plain' })
@@ -17,6 +36,40 @@ export function createApp(dbPath = process.env.DB_PATH ?? './arcade.db') {
       }
       return
     }
+
+    if (req.url?.startsWith('/api/admin/')) {
+      if (!isAdminAuthorized(req)) {
+        res.writeHead(401, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ error: 'Unauthorized' }))
+        return
+      }
+
+      if (req.method === 'GET' && req.url === '/api/admin/rooms') {
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ rooms: manager.list() }))
+        return
+      }
+
+      if (req.method === 'POST' && req.url === '/api/admin/rooms') {
+        const code = manager.create()
+        res.writeHead(201, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ code }))
+        return
+      }
+
+      const deleteMatch = req.method === 'DELETE' && req.url?.match(/^\/api\/admin\/rooms\/([A-Z0-9]+)$/)
+      if (deleteMatch) {
+        manager.delete(deleteMatch[1])
+        res.writeHead(204)
+        res.end()
+        return
+      }
+
+      res.writeHead(404)
+      res.end()
+      return
+    }
+
     res.writeHead(404, { 'Content-Type': 'text/plain' })
     res.end()
   })
@@ -28,7 +81,12 @@ export function createApp(dbPath = process.env.DB_PATH ?? './arcade.db') {
     },
   })
 
-  const manager = new RoomManager(io, {
+  if (process.env.REDIS_URL) {
+    const { adapter } = createRedisAdapter(process.env.REDIS_URL)
+    io.adapter(adapter)
+  }
+
+  manager = new RoomManager(io, {
     saveResults: (players) => saveResults(db, players),
   })
 

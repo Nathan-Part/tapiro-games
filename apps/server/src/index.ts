@@ -1,5 +1,7 @@
 import { createApp } from './createApp'
 
+try { process.loadEnvFile() } catch {}
+
 const { httpServer } = createApp()
 const PORT = Number(process.env.PORT ?? 4000)
 

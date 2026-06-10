@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
@@ -15,7 +16,7 @@ export default function LeaderboardPage() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    fetch('http://localhost:4000/api/leaderboard')
+    fetch(`${import.meta.env.VITE_SERVER_URL ?? 'http://localhost:4000'}/api/leaderboard`)
       .then(r => r.json())
       .then((data: ScoreEntry[]) => { setScores(data); setLoading(false) })
       .catch(() => { setError('Impossible de charger le classement'); setLoading(false) })
@@ -23,7 +24,7 @@ export default function LeaderboardPage() {
 
   return (
     <div style={s.screen}>
-      <button style={s.back} onClick={() => navigate(-1)}>← Retour</button>
+      <button style={s.back} onClick={() => navigate('/')}>← Retour</button>
       <h1 style={s.title}>Meilleurs scores</h1>
       <p style={s.subtitle}>Top 20 all-time — Tap Race</p>
       {loading && <p style={s.msg}>Chargement…</p>}
