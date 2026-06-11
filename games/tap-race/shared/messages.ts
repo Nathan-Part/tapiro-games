@@ -7,12 +7,18 @@ export const LeaderboardEntrySchema = z.object({
   name: z.string(),
   score: z.number().int().min(0),
   totalScore: z.number().int().min(0).optional(),
+  teamId: z.string().optional(),
   eliminated: z.boolean().optional(),
+})
+export const RoundSnapshotSchema = z.object({
+  round: z.number().int(),
+  players: z.array(LeaderboardEntrySchema),
 })
 export const LeaderboardUpdateSchema = z.object({
   players: z.array(LeaderboardEntrySchema),
   ropePosition: z.number().optional(),
   isFinalResults: z.boolean().optional(),
+  roundHistory: z.array(RoundSnapshotSchema).optional(),
 })
 export const GameStateUpdateSchema = z.object({
   phase: z.enum(['WAITING', 'COUNTDOWN', 'PLAYING', 'RESULTS']),
@@ -22,6 +28,7 @@ export const GameStateUpdateSchema = z.object({
   frenzy: z.boolean().optional(),
   currentRound: z.number().int().optional(),
   totalRounds: z.number().int().optional(),
+  mode: z.enum(['solo', 'team', 'survival', 'tug']).optional(),
 })
 export const FrenzyStateSchema = z.object({ active: z.boolean() })
 export const EliminationSchema = z.object({ ids: z.array(z.string()) })

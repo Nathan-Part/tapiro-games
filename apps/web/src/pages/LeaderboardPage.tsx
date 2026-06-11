@@ -126,7 +126,7 @@ export default function LeaderboardPage() {
                   <ul style={s.histList}>
                     {selected.sessions.map((session, i) => {
                       const key = session.sessionId || String(i)
-                      const sel = getSessionRound(key, session.rounds.length > 1 ? 'total' : 1)
+                      const sel = getSessionRound(key, session.rounds.length > 1 ? 'total' : (session.rounds[0]?.round ?? 1))
                       const shownScore = sel === 'total' ? session.total : (session.rounds.find(r => r.round === sel)?.score ?? 0)
                       return (
                         <li key={key} style={s.histSession}>
@@ -134,7 +134,7 @@ export default function LeaderboardPage() {
                             <span style={s.histTotal}>{shownScore} pts</span>
                             <span style={s.histDate}>{new Date(session.playedAt).toLocaleDateString('fr-FR')}</span>
                           </div>
-                          {session.rounds.length > 1 && (
+                          {session.rounds.length > 0 && (
                             <div style={s.histRounds}>
                               {session.rounds.map(r => (
                                 <button
@@ -145,12 +145,14 @@ export default function LeaderboardPage() {
                                   M{r.round}
                                 </button>
                               ))}
-                              <button
-                                style={{ ...s.histRoundBtn, ...(sel === 'total' ? s.histRoundBtnActive : {}), borderColor: 'rgba(255,200,61,0.3)' }}
-                                onClick={() => setSessionRound(key, 'total')}
-                              >
-                                Total
-                              </button>
+                              {session.rounds.length > 1 && (
+                                <button
+                                  style={{ ...s.histRoundBtn, ...(sel === 'total' ? s.histRoundBtnActive : {}), borderColor: 'rgba(255,200,61,0.3)' }}
+                                  onClick={() => setSessionRound(key, 'total')}
+                                >
+                                  Total
+                                </button>
+                              )}
                             </div>
                           )}
                         </li>

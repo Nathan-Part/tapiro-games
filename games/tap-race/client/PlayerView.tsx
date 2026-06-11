@@ -10,11 +10,13 @@ interface Props {
   state: PlayerViewState
   onTap: () => void
   onViewGlobalLeaderboard?: () => void
+  onReturnHome?: () => void
 }
 
 const delay = (ms: number) => ({ '--d': `${ms}ms` }) as React.CSSProperties
+const PODIUM_HEIGHTS = ['clamp(160px, 26vh, 240px)', 'clamp(110px, 18vh, 170px)', 'clamp(85px, 14vh, 135px)']
 
-export default function PlayerView({ state, onTap, onViewGlobalLeaderboard }: Props) {
+export default function PlayerView({ state, onTap, onViewGlobalLeaderboard, onReturnHome }: Props) {
   const offline = state.connected === false
   return (
     <>
@@ -28,12 +30,12 @@ export default function PlayerView({ state, onTap, onViewGlobalLeaderboard }: Pr
           ⚠ Reconnexion en cours…
         </div>
       )}
-      <PlayerViewInner state={state} onTap={onTap} onViewGlobalLeaderboard={onViewGlobalLeaderboard} />
+      <PlayerViewInner state={state} onTap={onTap} onViewGlobalLeaderboard={onViewGlobalLeaderboard} onReturnHome={onReturnHome} />
     </>
   )
 }
 
-function PlayerViewInner({ state, onTap, onViewGlobalLeaderboard }: Props) {
+function PlayerViewInner({ state, onTap, onViewGlobalLeaderboard, onReturnHome }: Props) {
   if (state.phase === 'WAITING') {
     return <WaitingScreen state={state} />
   }
@@ -58,7 +60,7 @@ function PlayerViewInner({ state, onTap, onViewGlobalLeaderboard }: Props) {
     return <PlayingScreen state={state} onTap={onTap} />
   }
 
-  return <ResultsScreen state={state} onViewGlobalLeaderboard={onViewGlobalLeaderboard} />
+  return <ResultsScreen state={state} onViewGlobalLeaderboard={onViewGlobalLeaderboard} onReturnHome={onReturnHome} />
 }
 
 function WaitingScreen({ state }: { state: PlayerViewState }) {
@@ -214,53 +216,157 @@ function PlayerTugRope({ teams, ropePosition }: { teams: { id: string; name: str
   )
 }
 
-function ResultsScreen({ state, onViewGlobalLeaderboard }: { state: PlayerViewState; onViewGlobalLeaderboard?: () => void }) {
+function ResultsScreen({ state, onViewGlobalLeaderboard, onReturnHome }: { state: PlayerViewState; onViewGlobalLeaderboard?: () => void; onReturnHome?: () => void }) {
   const [showParty, setShowParty] = useState(false)
   const isLastRound = !state.totalRounds || !state.currentRound || state.currentRound >= state.totalRounds
   const hasMoreRounds = state.totalRounds && state.currentRound && state.currentRound < state.totalRounds
-  const displayScore = isLastRound && state.totalScore !== undefined ? state.totalScore : state.score
-  const displayed = useCountUp(displayScore, 900)
+  const isSolo = !state.mode || state.mode === 'solo'
+
+  const snapshots = state.roundSnapshots ?? []
+  const latestPlayers = snapshots[snapshots.length - 1]?.players ?? []
+  const entryScore = (e: { score: number; totalScore?: number }) => isLastRound ? (e.totalScore ?? e.score) : e.score
+  const teamOf = (e: { teamId?: string }) => state.teams?.find(t => t.id === e.teamId)
+  const isMe = (e: { name: string }) => e.name === state.playerName
+
+  const medals = latestPlayers.slice(0, 3)
+  const rest = latestPlayers.slice(3)
+  const myRank = latestPlayers.findIndex(e => e.name === state.playerName) + 1
+  const myEntry = latestPlayers.find(e => e.name === state.playerName)
+  const myScore = isLastRound ? (state.totalScore ?? state.score) : state.score
+
   const winner = state.teams?.length ? state.teams.reduce((a, b) => a.score >= b.score ? a : b) : null
   const myTeam = state.teams?.find(t => t.id === state.teamId)
   const iWin = winner && myTeam && winner.id === myTeam.id
+  const displayedScore = useCountUp(myScore, 900)
 
   if (showParty && state.roundSnapshots) {
     return (
       <PartyResultsPanel
         snapshots={state.roundSnapshots}
-        finalLeaderboard={state.roundSnapshots[state.roundSnapshots.length - 1]?.players ?? []}
+        finalLeaderboard={snapshots[snapshots.length - 1]?.players ?? []}
         onClose={() => setShowParty(false)}
       />
     )
   }
 
   return (
-    <div className="tr-screen">
+    <div className="tr-screen" style={{ overflowY: 'auto', justifyContent: 'flex-start', paddingTop: '1rem', gap: '0.8rem' }}>
       <div className="tr-ambient" aria-hidden="true" />
       {isLastRound && <Confetti />}
       <p className="tr-kicker tr-rise">/// {hasMoreRounds ? `fin manche ${state.currentRound}` : 'course terminée'} ///</p>
+
       {winner ? (
-        <h2 className="tr-logo tr-rise" style={{ ...delay(100), fontSize: 'clamp(1.6rem, 7vw, 2.4rem)', color: iWin ? winner.color : '#888' }}>
-          {iWin ? `🏆 ${winner.name} gagne !` : `${winner.name} gagne…`}
-        </h2>
+        <div className="tr-rise" style={{ ...delay(80), textAlign: 'center' }}>
+          {isLastRound && (
+            <>
+              <p style={{ margin: '0 0 0.2rem', fontSize: '0.8rem', color: '#aaa', fontFamily: 'var(--tr-term)' }}>équipe gagnante</p>
+              <h2 style={{ margin: 0, fontSize: 'clamp(1.6rem, 7vw, 2.4rem)', fontWeight: 'bold', color: iWin ? winner.color : '#888' }}>
+                🏆 {winner.name}
+              </h2>
+            </>
+          )}
+          <div style={{ display: 'flex', gap: '0.7rem', justifyContent: 'center', marginTop: '0.6rem' }}>
+            {state.teams!.map(t => (
+              <div key={t.id} style={{
+                textAlign: 'center', padding: '0.5rem 1rem', borderRadius: 10,
+                background: `${t.color}14`, border: `2px solid ${t.id === winner?.id ? t.color : t.color + '44'}`,
+                boxShadow: t.id === winner?.id ? `0 0 16px ${t.color}44` : 'none',
+                minWidth: 80,
+              }}>
+                <p style={{ margin: 0, fontSize: '0.72rem', color: t.color, fontFamily: 'var(--tr-term)' }}>{t.name}</p>
+                <p style={{ margin: 0, fontSize: '1.7rem', fontWeight: 'bold', color: t.id === winner?.id ? t.color : '#888', fontFamily: 'var(--tr-display)' }}>{t.score}</p>
+                {t.id === winner?.id && isLastRound && <p style={{ margin: 0, fontSize: '0.65rem', color: t.color }}>🏆</p>}
+              </div>
+            ))}
+          </div>
+        </div>
       ) : (
-        <h2 className="tr-logo tr-rise" style={{ ...delay(100), fontSize: 'clamp(1.9rem, 8vw, 2.8rem)' }}>
+        <h2 className="tr-logo tr-rise" style={{ ...delay(80), fontSize: 'clamp(1.6rem, 7vw, 2.2rem)' }}>
           {hasMoreRounds ? `Manche ${state.currentRound}/${state.totalRounds}` : 'Terminé !'}
         </h2>
       )}
-      <p className="tr-final tr-rise" style={delay(250)}>{displayed}</p>
-      <p className="tr-label tr-rise" style={delay(400)}>taps</p>
+
+      {medals.length > 0 ? (
+        <>
+          <div className="tr-podium">
+            {([medals[1], medals[0], medals[2]] as typeof medals).map((entry, i) => {
+              if (!entry) return null
+              const rank = [2, 1, 3][i]
+              const me = isMe(entry)
+              const team = teamOf(entry)
+              return (
+                <div
+                  key={entry.id}
+                  className={`tr-podium__slot tr-podium__slot--${rank}`}
+                  style={delay([450, 850, 100][i])}
+                >
+                  <p className="tr-podium__name" style={me ? { color: 'var(--cyan)', textShadow: '0 0 14px rgba(0,245,255,0.8)' } : undefined}>{entry.name}</p>
+                  <p className="tr-podium__score" style={me ? { color: 'var(--cyan)' } : undefined}>{entryScore(entry)}</p>
+                  <div className="tr-podium__col" style={{ height: PODIUM_HEIGHTS[rank - 1], ...(team ? { borderLeft: `4px solid ${team.color}`, boxShadow: `inset 4px 0 10px ${team.color}40` } : {}) }}>
+                    {rank}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          {rest.length > 0 && (
+            <ol className="tr-resultlist">
+              {rest.map((e, i) => {
+                const me = isMe(e)
+                const team = teamOf(e)
+                return (
+                  <li key={e.id} className="tr-resultrow tr-rise" style={{ ...delay(1100 + i * 60), borderLeft: team ? `3px solid ${team.color}` : undefined }}>
+                    <span className="tr-rank">{i + 4}</span>
+                    <span className="tr-resultrow__name" style={me ? { color: 'var(--cyan)', fontWeight: 700 } : undefined}>{e.name}</span>
+                    <span className="tr-resultrow__score" style={me ? { color: 'var(--cyan)' } : undefined}>{entryScore(e)}</span>
+                  </li>
+                )
+              })}
+            </ol>
+          )}
+
+          {(myRank === 0 || myRank > latestPlayers.length) && (
+            <div style={{ width: '100%', maxWidth: 340, padding: '0.5rem 0.8rem', borderRadius: 9, background: 'rgba(0,245,255,0.08)', border: '1px solid var(--cyan)', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+              <span style={{ fontSize: '0.8rem', color: 'var(--cyan)', fontFamily: 'var(--tr-term)', minWidth: '2rem' }}>Vous</span>
+              <span style={{ flex: 1, fontSize: '0.9rem', color: 'var(--cyan)', fontWeight: 700 }}>{state.playerName}</span>
+              <span style={{ fontSize: '0.9rem', color: 'var(--cyan)', fontFamily: 'var(--tr-term)' }}>{myScore}</span>
+            </div>
+          )}
+        </>
+      ) : (
+        <>
+          <p className="tr-final tr-rise" style={delay(250)}>{displayedScore}</p>
+          <p className="tr-label tr-rise" style={delay(400)}>taps</p>
+        </>
+      )}
+
+      {myEntry && myRank > 0 && myRank <= latestPlayers.length && (
+        <div className="tr-rise" style={{ ...delay(1200), textAlign: 'center' }}>
+          <p style={{ margin: 0, fontSize: '0.72rem', color: '#666', fontFamily: 'var(--tr-term)' }}>Votre classement</p>
+          <p style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, color: 'var(--cyan)', textShadow: '0 0 16px rgba(0,245,255,0.8), 0 0 4px rgba(0,245,255,0.5)' }}>
+            #{myRank} — {myScore} taps
+          </p>
+        </div>
+      )}
+
       {hasMoreRounds && (
         <p className="tr-hint tr-rise" style={delay(500)}>Prochaine manche dans quelques secondes…</p>
       )}
+
       {isLastRound && state.roundSnapshots && state.roundSnapshots.length > 0 && (
-        <button className="tr-ghostbtn tr-rise" style={delay(500)} onClick={() => setShowParty(true)}>
+        <button className="tr-ghostbtn tr-rise" style={delay(1300)} onClick={() => setShowParty(true)}>
           Score de la partie
         </button>
       )}
-      {isLastRound && onViewGlobalLeaderboard && (
-        <button className="tr-ghostbtn tr-rise" style={delay(620)} onClick={onViewGlobalLeaderboard}>
+      {isLastRound && isSolo && onViewGlobalLeaderboard && (
+        <button className="tr-ghostbtn tr-rise" style={delay(1420)} onClick={onViewGlobalLeaderboard}>
           Voir score global
+        </button>
+      )}
+      {isLastRound && onReturnHome && (
+        <button className="tr-ghostbtn tr-rise" style={delay(isSolo ? 1540 : 1420)} onClick={onReturnHome}>
+          Retour au menu
         </button>
       )}
     </div>

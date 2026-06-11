@@ -10,13 +10,14 @@ interface Props {
   qrUrl?: string
   onStart?: () => void
   onViewGlobalLeaderboard?: () => void
+  onReturnHome?: () => void
 }
 
 const ROW_HEIGHT = 60
 const ROW_STEP = 72
 const delay = (ms: number) => ({ '--d': `${ms}ms` }) as React.CSSProperties
 
-export default function HostView({ state, qrUrl, onStart, onViewGlobalLeaderboard }: Props) {
+export default function HostView({ state, qrUrl, onStart, onViewGlobalLeaderboard, onReturnHome }: Props) {
   if (state.phase === 'WAITING') {
     return <WaitingScreen state={state} qrUrl={qrUrl} onStart={onStart} />
   }
@@ -26,7 +27,7 @@ export default function HostView({ state, qrUrl, onStart, onViewGlobalLeaderboar
   if (state.phase === 'PLAYING') {
     return <PlayingScreen state={state} />
   }
-  return <ResultsScreen state={state} onViewGlobalLeaderboard={onViewGlobalLeaderboard} />
+  return <ResultsScreen state={state} onViewGlobalLeaderboard={onViewGlobalLeaderboard} onReturnHome={onReturnHome} />
 }
 
 /* ---------- WAITING : QR géant + lobby ---------- */
@@ -253,7 +254,7 @@ function AnimatedScore({ value }: { value: number }) {
 const PODIUM_HEIGHTS = ['clamp(160px, 26vh, 240px)', 'clamp(110px, 18vh, 170px)', 'clamp(85px, 14vh, 135px)']
 const PODIUM_DELAYS = [850, 450, 100]
 
-function ResultsScreen({ state, onViewGlobalLeaderboard }: { state: HostViewState; onViewGlobalLeaderboard?: () => void }) {
+function ResultsScreen({ state, onViewGlobalLeaderboard, onReturnHome }: { state: HostViewState; onViewGlobalLeaderboard?: () => void; onReturnHome?: () => void }) {
   const [showParty, setShowParty] = useState(false)
   const medals = state.leaderboard.slice(0, 3)
   const rest = state.leaderboard.slice(3)
@@ -261,7 +262,9 @@ function ResultsScreen({ state, onViewGlobalLeaderboard }: { state: HostViewStat
   const ranks = [2, 1, 3]
   const isLastRound = state.isFinalResults || !state.totalRounds || !state.currentRound || state.currentRound >= state.totalRounds
   const hasMoreRounds = !state.isFinalResults && state.totalRounds && state.currentRound && state.currentRound < state.totalRounds
+  const isSolo = !state.mode || state.mode === 'solo'
   const entryScore = (e: LeaderboardEntry) => state.isFinalResults ? (e.totalScore ?? e.score) : e.score
+  const teamOf = (e: LeaderboardEntry) => state.teams?.find(t => t.id === e.teamId)
 
   if (showParty && state.roundSnapshots) {
     return (
@@ -293,11 +296,18 @@ function ResultsScreen({ state, onViewGlobalLeaderboard }: { state: HostViewStat
                 </h2>
               </>
             )}
-            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', marginTop: '0.5rem' }}>
+            <div style={{ display: 'flex', gap: '1.2rem', justifyContent: 'center', marginTop: '0.8rem' }}>
               {state.teams!.map(t => (
-                <span key={t.id} style={{ fontFamily: 'monospace', color: t.id === winner.id ? t.color : '#555', fontSize: '1rem' }}>
-                  {t.name} {t.score}
-                </span>
+                <div key={t.id} style={{
+                  textAlign: 'center', padding: '0.7rem 1.6rem', borderRadius: 12,
+                  background: `${t.color}14`, border: `2px solid ${t.id === winner.id ? t.color : t.color + '44'}`,
+                  boxShadow: t.id === winner.id ? `0 0 28px ${t.color}55` : 'none',
+                  minWidth: 120, transition: 'box-shadow 0.4s',
+                }}>
+                  <p style={{ margin: 0, fontSize: '0.85rem', color: t.color, fontFamily: 'monospace', fontWeight: 'bold', letterSpacing: '0.08em' }}>{t.name}</p>
+                  <p style={{ margin: '0.2rem 0 0', fontSize: 'clamp(2rem, 5vmin, 3.2rem)', fontWeight: 'bold', color: t.id === winner.id ? t.color : '#999', fontFamily: 'var(--tr-display)' }}>{t.score}</p>
+                  {t.id === winner.id && isLastRound && <p style={{ margin: '0.15rem 0 0', fontSize: '0.75rem', color: t.color }}>🏆 Victoire</p>}
+                </div>
               ))}
             </div>
           </div>
@@ -319,7 +329,10 @@ function ResultsScreen({ state, onViewGlobalLeaderboard }: { state: HostViewStat
                 className={`tr-podium__slot tr-podium__slot--${ranks[i]}`}
                 style={delay(PODIUM_DELAYS[i])}
               >
-                <p className="tr-podium__name">{entry.name}</p>
+                <p className="tr-podium__name">
+                  {teamOf(entry) && <span style={{ display: 'inline-block', width: 3, height: '0.85em', borderRadius: 2, background: teamOf(entry)!.color, boxShadow: `0 0 6px ${teamOf(entry)!.color}`, marginRight: '0.35em', verticalAlign: 'middle' }} />}
+                  {entry.name}
+                </p>
                 <p className="tr-podium__score">{entryScore(entry)}</p>
                 <div className="tr-podium__col" style={{ height: PODIUM_HEIGHTS[ranks[i] - 1] }}>
                   {ranks[i]}
@@ -332,13 +345,16 @@ function ResultsScreen({ state, onViewGlobalLeaderboard }: { state: HostViewStat
 
       {rest.length > 0 && (
         <ol className="tr-resultlist">
-          {rest.map((e, i) => (
-            <li key={e.id} className="tr-resultrow" style={delay(1100 + i * 90)}>
-              <span className="tr-rank">{i + 4}</span>
-              <span className="tr-resultrow__name">{e.name}</span>
-              <span className="tr-resultrow__score">{entryScore(e)}</span>
-            </li>
-          ))}
+          {rest.map((e, i) => {
+            const team = teamOf(e)
+            return (
+              <li key={e.id} className="tr-resultrow" style={{ ...delay(1100 + i * 90), borderLeft: team ? `3px solid ${team.color}` : undefined }}>
+                <span className="tr-rank">{i + 4}</span>
+                <span className="tr-resultrow__name">{e.name}</span>
+                <span className="tr-resultrow__score">{entryScore(e)}</span>
+              </li>
+            )
+          })}
         </ol>
       )}
 
@@ -353,9 +369,14 @@ function ResultsScreen({ state, onViewGlobalLeaderboard }: { state: HostViewStat
           Score de la partie
         </button>
       )}
-      {isLastRound && onViewGlobalLeaderboard && (
+      {isLastRound && isSolo && onViewGlobalLeaderboard && (
         <button className="tr-ghostbtn tr-rise" style={delay(1450)} onClick={onViewGlobalLeaderboard}>
           Voir score global
+        </button>
+      )}
+      {isLastRound && onReturnHome && (
+        <button className="tr-ghostbtn tr-rise" style={delay(isSolo ? 1570 : 1450)} onClick={onReturnHome}>
+          Retour au menu
         </button>
       )}
     </div>

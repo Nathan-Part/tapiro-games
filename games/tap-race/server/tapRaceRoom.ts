@@ -44,6 +44,7 @@ export class TapRaceRoom {
   private disconnectHandlers = new Map<string, () => void>()
   private purgeTimers = new Map<string, ReturnType<typeof setTimeout>>()
   private sessionId: string | null = null
+  private roundHistory: { round: number; players: { id: string; name: string; score: number; totalScore: number; teamId?: string; eliminated?: boolean }[] }[] = []
   readonly hostToken = randomUUID()
   lastActivity: number = Date.now()
 
@@ -147,6 +148,7 @@ export class TapRaceRoom {
         Object.entries(this.state.players).map(([id, p]) => [id, { ...p, score: 0, cumulativeScore: 0, ticksSinceLastTap: 0, eliminated: false }]),
       )
       this.state = { ...makeInitialState(this.config.rounds ?? 1, this.config.duration ?? 60), players }
+      this.roundHistory = []
     }
     if (this.state.phase !== 'WAITING') return
     if (Object.keys(this.state.players).length === 0) return
@@ -238,8 +240,17 @@ export class TapRaceRoom {
     }, SURVIVAL_INTERVAL_MS)
   }
 
+  private saveRoundSnapshot(round: number, useTotalScore: boolean) {
+    if (this.roundHistory.find(s => s.round === round)) return
+    const players = getLeaderboard(this.state, useTotalScore).map(p => ({
+      id: p.id, name: p.name, score: p.score, totalScore: totalScore(p), teamId: p.teamId, eliminated: p.eliminated,
+    }))
+    this.roundHistory.push({ round, players })
+  }
+
   private maybeScheduleNextRound() {
     if (this.state.currentRound < this.state.totalRounds) {
+      this.saveRoundSnapshot(this.state.currentRound, false)
       this.nextRoundTimeout = setTimeout(() => {
         this.nextRoundTimeout = null
         this.state = serverReducer(this.state, { type: 'NEXT_ROUND', survivorOnly: this.config.mode === 'survival' })
@@ -258,6 +269,7 @@ export class TapRaceRoom {
       frenzy: this.state.frenzy,
       currentRound: this.state.currentRound,
       totalRounds: this.state.totalRounds,
+      mode: this.config.mode,
     }
   }
 
@@ -265,14 +277,20 @@ export class TapRaceRoom {
     const isFinalResults = this.state.phase === 'RESULTS' && this.state.currentRound >= this.state.totalRounds
     const leaderboard = getLeaderboard(this.state, isFinalResults)
     const players = leaderboard.map(p => ({ ...p, totalScore: totalScore(p) }))
+    type RoundHistoryEntry = { round: number; players: { id: string; name: string; score: number; totalScore: number; teamId?: string; eliminated?: boolean }[] }
     const payload: {
       players: typeof players
       teams?: ReturnType<typeof getTeamScores>
       ropePosition?: number
       isFinalResults?: boolean
+      roundHistory?: RoundHistoryEntry[]
     } = { players }
 
-    if (isFinalResults) payload.isFinalResults = true
+    if (isFinalResults) {
+      this.saveRoundSnapshot(this.state.currentRound, true)
+      payload.isFinalResults = true
+      payload.roundHistory = this.roundHistory
+    }
 
     if (this.config.mode === 'team' || this.config.mode === 'tug') {
       payload.teams = getTeamScores(this.state, this.config.teams, isFinalResults)

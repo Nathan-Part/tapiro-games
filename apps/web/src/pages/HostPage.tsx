@@ -25,6 +25,7 @@ export default function HostPage() {
   const [isFinalResults, setIsFinalResults] = useState(false)
   const [gameDuration, setGameDuration] = useState(60)
   const [roundSnapshots, setRoundSnapshots] = useState<RoundSnapshot[]>([])
+  const [mode, setMode] = useState<string>('solo')
   const phaseRef = useRef<Phase>('WAITING')
   const currentRoundRef = useRef(1)
 
@@ -37,7 +38,7 @@ export default function HostPage() {
     const doHost = () => socket.emit('HOST_ROOM', { code, token: hostToken })
     if (socket.connected) { doHost() } else { socket.once('connect', doHost); socket.connect() }
     socket.once('ERROR', () => setNotFound(true))
-    socket.on('GAME_STATE', (d: { phase: Phase; countdown?: number; timeLeft?: number; gameDuration?: number; frenzy?: boolean; currentRound?: number; totalRounds?: number }) => {
+    socket.on('GAME_STATE', (d: { phase: Phase; countdown?: number; timeLeft?: number; gameDuration?: number; frenzy?: boolean; currentRound?: number; totalRounds?: number; mode?: string }) => {
       phaseRef.current = d.phase
       setPhase(d.phase)
       if (d.countdown !== undefined) setCountdown(d.countdown)
@@ -46,15 +47,18 @@ export default function HostPage() {
       if (d.frenzy !== undefined) setFrenzy(d.frenzy)
       if (d.currentRound !== undefined) { setCurrentRound(d.currentRound); currentRoundRef.current = d.currentRound }
       if (d.totalRounds !== undefined) setTotalRounds(d.totalRounds)
+      if (d.mode !== undefined) setMode(d.mode)
       if (d.phase === 'COUNTDOWN' || d.phase === 'WAITING') setFrenzy(false)
       if (d.phase === 'WAITING') setRoundSnapshots([])
     })
-    socket.on('LEADERBOARD_UPDATE', (d: { players: LeaderboardEntry[]; teams?: TeamScore[]; ropePosition?: number; isFinalResults?: boolean }) => {
+    socket.on('LEADERBOARD_UPDATE', (d: { players: LeaderboardEntry[]; teams?: TeamScore[]; ropePosition?: number; isFinalResults?: boolean; roundHistory?: RoundSnapshot[] }) => {
       setLeaderboard(d.players)
       if (d.teams) setTeams(d.teams)
       setRopePosition(d.ropePosition)
       if (d.isFinalResults !== undefined) setIsFinalResults(d.isFinalResults)
-      if (phaseRef.current === 'RESULTS') {
+      if (d.roundHistory && d.roundHistory.length > 0) {
+        setRoundSnapshots(d.roundHistory)
+      } else if (phaseRef.current === 'RESULTS') {
         const rnd = currentRoundRef.current
         setRoundSnapshots(prev => prev.find(s => s.round === rnd) ? prev : [...prev, { round: rnd, players: d.players }])
       }
@@ -80,6 +84,7 @@ export default function HostPage() {
     isFinalResults,
     gameDuration,
     roundSnapshots,
+    mode,
   }
 
   return (
@@ -88,6 +93,7 @@ export default function HostPage() {
       qrUrl={qrUrl}
       onStart={() => socket.emit('START_GAME', { code, token: code ? sessionStorage.getItem(`host-token-${code}`) : null })}
       onViewGlobalLeaderboard={() => navigate('/leaderboard')}
+      onReturnHome={() => navigate('/')}
     />
   )
 }

@@ -144,7 +144,7 @@ export default function PlayerPage() {
       setScore(d.score)
       if (d.eliminated !== undefined) setEliminated(d.eliminated)
     })
-    socket.on('LEADERBOARD_UPDATE', (d: { players?: { id: string; name: string; score: number; totalScore?: number; eliminated?: boolean }[]; teams?: TeamScore[]; ropePosition?: number; isFinalResults?: boolean }) => {
+    socket.on('LEADERBOARD_UPDATE', (d: { players?: { id: string; name: string; score: number; totalScore?: number; teamId?: string; eliminated?: boolean }[]; teams?: TeamScore[]; ropePosition?: number; isFinalResults?: boolean; roundHistory?: RoundSnapshot[] }) => {
       if (d.teams) setTeams(d.teams)
       if (d.ropePosition !== undefined) setRopePosition(d.ropePosition)
       if (d.players) {
@@ -153,7 +153,9 @@ export default function PlayerPage() {
           const me = d.players.find(p => p.name === myName)
           if (me?.totalScore !== undefined) setTotalScore(me.totalScore)
         }
-        if (phaseRef.current === 'RESULTS') {
+        if (d.roundHistory && d.roundHistory.length > 0) {
+          setRoundSnapshots(d.roundHistory)
+        } else if (phaseRef.current === 'RESULTS') {
           const rnd = currentRoundRef.current
           setRoundSnapshots(prev => prev.find(s => s.round === rnd) ? prev : [...prev, { round: rnd, players: d.players! }])
         }
@@ -324,12 +326,14 @@ export default function PlayerPage() {
     ropePosition,
     connected,
     roundSnapshots,
+    mode: roomInfo?.mode,
   }
   return (
     <PlayerView
       state={state}
       onTap={() => { tapBuffer.current += 1; setScore(prev => prev + (frenzyRef.current ? 2 : 1)) }}
       onViewGlobalLeaderboard={() => navigate('/leaderboard')}
+      onReturnHome={() => navigate('/')}
     />
   )
 }

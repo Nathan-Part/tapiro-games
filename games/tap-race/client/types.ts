@@ -37,6 +37,7 @@ export interface PlayerViewState {
   ropePosition?: number
   connected?: boolean
   roundSnapshots?: RoundSnapshot[]
+  mode?: string
 }
 
 export interface HostViewState {
@@ -53,4 +54,5 @@ export interface HostViewState {
   isFinalResults?: boolean
   gameDuration?: number
   roundSnapshots?: RoundSnapshot[]
+  mode?: string
 }

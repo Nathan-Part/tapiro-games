@@ -83,7 +83,7 @@ export function serverReducer(state: ServerGameState, event: ServerEvent): Serve
 
     case 'TICK':
       if (state.phase === 'COUNTDOWN') {
-        if (state.countdown <= 1) return { ...state, phase: 'PLAYING', timeLeft: 60 }
+        if (state.countdown <= 1) return { ...state, phase: 'PLAYING', timeLeft: state.gameDuration }
         return { ...state, countdown: state.countdown - 1 }
       }
       if (state.phase === 'PLAYING') {

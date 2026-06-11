@@ -33,7 +33,7 @@ export default function PartyResultsPanel({ snapshots, finalLeaderboard, onClose
         </button>
       </div>
 
-      {hasMany && (
+      {snapshots.length > 0 && (
         <div className="tr-party-panel__tabs">
           {snapshots.map(s => (
             <button
@@ -44,12 +44,14 @@ export default function PartyResultsPanel({ snapshots, finalLeaderboard, onClose
               Manche {s.round}
             </button>
           ))}
-          <button
-            className={`tr-round-tab tr-round-tab--final${selected === 'final' ? ' tr-round-tab--active' : ''}`}
-            onClick={() => setSelected('final')}
-          >
-            Résultat final
-          </button>
+          {hasMany && (
+            <button
+              className={`tr-round-tab tr-round-tab--final${selected === 'final' ? ' tr-round-tab--active' : ''}`}
+              onClick={() => setSelected('final')}
+            >
+              Résultat final
+            </button>
+          )}
         </div>
       )}
 
