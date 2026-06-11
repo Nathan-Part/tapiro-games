@@ -11,12 +11,14 @@ interface ScoreEntry {
   playedAt: string
 }
 
+interface RoundResult { round: number; score: number }
+interface SessionEntry { sessionId: string; playedAt: string; rounds: RoundResult[]; total: number }
 interface PlayerStats {
   name: string
   gamesPlayed: number
   bestScore: number
   avgScore: number
-  history: { score: number; playedAt: string }[]
+  sessions: SessionEntry[]
 }
 
 const RANK_COLORS = ['var(--gold)', 'var(--silver)', 'var(--bronze)']
@@ -28,6 +30,9 @@ export default function LeaderboardPage() {
   const [error, setError] = useState('')
   const [selected, setSelected] = useState<PlayerStats | null>(null)
   const [loadingPlayer, setLoadingPlayer] = useState(false)
+  const [sessionRounds, setSessionRounds] = useState<Record<string, number | 'total'>>({})
+  const getSessionRound = (key: string, defaultVal: number | 'total') => sessionRounds[key] ?? defaultVal
+  const setSessionRound = (key: string, val: number | 'total') => setSessionRounds(prev => ({ ...prev, [key]: val }))
 
   useEffect(() => {
     fetch(`${API}/api/leaderboard`)
@@ -117,16 +122,40 @@ export default function LeaderboardPage() {
                       <span className="arc-label" style={s.statLabel}>Moyenne</span>
                     </div>
                   </div>
-                  <p className="arc-label">Historique</p>
+                  <p className="arc-label">Historique des parties</p>
                   <ul style={s.histList}>
-                    {selected.history.map((h, i) => (
-                      <li key={i} style={s.histRow}>
-                        <span style={s.histScore}>{h.score}</span>
-                        <span style={s.histDate}>
-                          {new Date(h.playedAt).toLocaleDateString('fr-FR')}
-                        </span>
-                      </li>
-                    ))}
+                    {selected.sessions.map((session, i) => {
+                      const key = session.sessionId || String(i)
+                      const sel = getSessionRound(key, session.rounds.length > 1 ? 'total' : 1)
+                      const shownScore = sel === 'total' ? session.total : (session.rounds.find(r => r.round === sel)?.score ?? 0)
+                      return (
+                        <li key={key} style={s.histSession}>
+                          <div style={s.histSessionHeader}>
+                            <span style={s.histTotal}>{shownScore} pts</span>
+                            <span style={s.histDate}>{new Date(session.playedAt).toLocaleDateString('fr-FR')}</span>
+                          </div>
+                          {session.rounds.length > 1 && (
+                            <div style={s.histRounds}>
+                              {session.rounds.map(r => (
+                                <button
+                                  key={r.round}
+                                  style={{ ...s.histRoundBtn, ...(sel === r.round ? s.histRoundBtnActive : {}) }}
+                                  onClick={() => setSessionRound(key, r.round)}
+                                >
+                                  M{r.round}
+                                </button>
+                              ))}
+                              <button
+                                style={{ ...s.histRoundBtn, ...(sel === 'total' ? s.histRoundBtnActive : {}), borderColor: 'rgba(255,200,61,0.3)' }}
+                                onClick={() => setSessionRound(key, 'total')}
+                              >
+                                Total
+                              </button>
+                            </div>
+                          )}
+                        </li>
+                      )
+                    })}
                   </ul>
                 </>
               )}
@@ -180,11 +209,22 @@ const s: Record<string, React.CSSProperties> = {
     listStyle: 'none', padding: 0, margin: 0,
     display: 'flex', flexDirection: 'column', gap: '0.4rem',
   },
-  histRow: {
-    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+  histSession: {
     padding: '0.55rem 0.85rem', background: 'rgba(2, 2, 8, 0.6)',
     border: '1px solid rgba(0, 245, 255, 0.08)', borderRadius: 9,
+    display: 'flex', flexDirection: 'column' as const, gap: '0.35rem',
   },
-  histScore: { color: 'var(--cyan)', fontWeight: 700, fontFamily: 'var(--font-display)' },
+  histSessionHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
+  histTotal: { color: 'var(--cyan)', fontWeight: 700, fontFamily: 'var(--font-display)', fontSize: '1.05rem' },
   histDate: { color: 'var(--ink-faint)', fontSize: '0.82rem' },
+  histRounds: { display: 'flex', gap: '0.4rem', flexWrap: 'wrap' as const, marginTop: '0.15rem' },
+  histRoundBtn: {
+    padding: '0.2rem 0.65rem', border: '1px solid rgba(0,245,255,0.22)', borderRadius: 14,
+    background: 'transparent', color: 'var(--ink-faint)', cursor: 'pointer',
+    fontFamily: 'var(--font-display)', fontSize: '0.72rem', transition: 'all 0.12s',
+  },
+  histRoundBtnActive: {
+    background: 'rgba(0,245,255,0.12)', borderColor: 'var(--cyan)',
+    color: 'var(--cyan)',
+  },
 }

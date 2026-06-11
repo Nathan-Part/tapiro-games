@@ -1,34 +1,49 @@
 import { randomUUID } from 'node:crypto'
 import type { Server, Socket } from 'socket.io'
-import { serverReducer, getLeaderboard, getTeamScores, makeInitialState, type ServerGameState, type TeamConfig } from './tapRaceGame'
+import { serverReducer, getLeaderboard, getTeamScores, totalScore, makeInitialState, type ServerGameState, type TeamConfig } from './tapRaceGame'
 import { TapBatchSchema } from '../shared/messages'
 
-/** Plafond de taps comptabilisés par seconde et par joueur (anti-triche). */
 const MAX_TAPS_PER_SEC = 25
+const FRENZY_DURATION_MS = 5_000
+const FRENZY_MIN_DELAY_MS = 12_000
+const FRENZY_MAX_EXTRA_MS = 13_000
+const SURVIVAL_INTERVAL_MS = 10_000
+const NEXT_ROUND_DELAY_MS = 5_000
+/** One team needs this share of total taps to win tug-of-war early. */
+const TUG_WIN_THRESHOLD = 0.8
+const TUG_MIN_TOTAL_TAPS = 30
 
-type SaveResultsFn = (players: { name: string; score: number }[]) => void
+type SaveResultsFn = (sessionId: string, round: number, players: { name: string; score: number }[]) => void
 
 export interface RoomConfig {
-  mode: 'solo' | 'team'
+  mode: 'solo' | 'team' | 'survival' | 'tug'
   teams: TeamConfig[]
+  rounds?: number
+  duration?: number
 }
 
 interface PlayerSession {
   socketId: string
   name: string
   score: number
+  cumulativeScore: number
   teamId?: string
+  eliminated: boolean
 }
 
 export class TapRaceRoom {
-  private state: ServerGameState = makeInitialState()
+  private state: ServerGameState
   private tickInterval: ReturnType<typeof setInterval> | null = null
   private leaderboardInterval: ReturnType<typeof setInterval> | null = null
   private scoreInterval: ReturnType<typeof setInterval> | null = null
+  private frenzyTimeout: ReturnType<typeof setTimeout> | null = null
+  private frenzyEndTimeout: ReturnType<typeof setTimeout> | null = null
+  private eliminationInterval: ReturnType<typeof setInterval> | null = null
+  private nextRoundTimeout: ReturnType<typeof setTimeout> | null = null
   private sessions = new Map<string, PlayerSession>()
   private disconnectHandlers = new Map<string, () => void>()
   private purgeTimers = new Map<string, ReturnType<typeof setTimeout>>()
-  /** Secret remis au créateur (admin) ; requis pour héberger/démarrer la room. */
+  private sessionId: string | null = null
   readonly hostToken = randomUUID()
   lastActivity: number = Date.now()
 
@@ -38,7 +53,9 @@ export class TapRaceRoom {
     private readonly saveResults: SaveResultsFn = () => {},
     private readonly config: RoomConfig = { mode: 'solo', teams: [] },
     private readonly maxPlayers: number = 10_000,
-  ) {}
+  ) {
+    this.state = makeInitialState(config.rounds ?? 1, config.duration ?? 60)
+  }
 
   getConfig(): RoomConfig { return this.config }
 
@@ -56,14 +73,14 @@ export class TapRaceRoom {
       return
     }
     const token = randomUUID()
-    this.sessions.set(token, { socketId: socket.id, name, score: 0, teamId })
+    this.sessions.set(token, { socketId: socket.id, name, score: 0, cumulativeScore: 0, teamId, eliminated: false })
     this.lastActivity = Date.now()
 
     socket.join(this.roomId)
     this.state = serverReducer(this.state, { type: 'PLAYER_JOIN', id: socket.id, name, teamId })
 
     socket.emit('JOINED', { token })
-    socket.emit('GAME_STATE', { phase: this.state.phase, countdown: this.state.countdown, timeLeft: this.state.timeLeft })
+    socket.emit('GAME_STATE', this.buildStatePayload())
     this.emitLeaderboard()
     this.broadcastPlayerList()
 
@@ -85,12 +102,12 @@ export class TapRaceRoom {
       ...this.state,
       players: {
         ...this.state.players,
-        [socket.id]: { id: socket.id, name: session.name, score: session.score, teamId: session.teamId },
+        [socket.id]: { id: socket.id, name: session.name, score: session.score, cumulativeScore: session.cumulativeScore, teamId: session.teamId, eliminated: session.eliminated, ticksSinceLastTap: 0 },
       },
     }
 
-    socket.emit('GAME_STATE', { phase: this.state.phase, countdown: this.state.countdown, timeLeft: this.state.timeLeft })
-    socket.emit('SCORE_UPDATE', { score: session.score })
+    socket.emit('GAME_STATE', this.buildStatePayload())
+    socket.emit('SCORE_UPDATE', { score: session.score, eliminated: session.eliminated })
     this.emitLeaderboard()
     this.broadcastPlayerList()
 
@@ -103,7 +120,11 @@ export class TapRaceRoom {
     const entry = [...this.sessions.entries()].find(([, s]) => s.socketId === socket.id)
     if (entry) {
       const currentPlayer = this.state.players[socket.id]
-      if (currentPlayer) entry[1].score = currentPlayer.score
+      if (currentPlayer) {
+        entry[1].score = currentPlayer.score
+        entry[1].cumulativeScore = currentPlayer.cumulativeScore
+        entry[1].eliminated = currentPlayer.eliminated
+      }
     }
     this.state = serverReducer(this.state, { type: 'PLAYER_LEAVE', id: socket.id })
     this.emitLeaderboard()
@@ -114,7 +135,7 @@ export class TapRaceRoom {
   watchAsHost(socket: Socket, token: string): boolean {
     if (token !== this.hostToken) return false
     socket.join(this.roomId)
-    socket.emit('GAME_STATE', { phase: this.state.phase, countdown: this.state.countdown, timeLeft: this.state.timeLeft })
+    socket.emit('GAME_STATE', this.buildStatePayload())
     socket.emit('LEADERBOARD_UPDATE', this.buildLeaderboardPayload())
     return true
   }
@@ -122,26 +143,45 @@ export class TapRaceRoom {
   start(token: string) {
     if (token !== this.hostToken) return
     if (this.state.phase === 'RESULTS') {
-      // rejouer : on conserve les joueurs connectés, scores remis à zéro
       const players = Object.fromEntries(
-        Object.entries(this.state.players).map(([id, p]) => [id, { ...p, score: 0 }]),
+        Object.entries(this.state.players).map(([id, p]) => [id, { ...p, score: 0, cumulativeScore: 0, ticksSinceLastTap: 0, eliminated: false }]),
       )
-      this.state = { ...makeInitialState(), players }
+      this.state = { ...makeInitialState(this.config.rounds ?? 1, this.config.duration ?? 60), players }
     }
     if (this.state.phase !== 'WAITING') return
     if (Object.keys(this.state.players).length === 0) return
+    this.sessionId = randomUUID()
     this.lastActivity = Date.now()
     this.state = serverReducer(this.state, { type: 'START' })
     this.broadcast()
+    this.startIntervals()
+  }
+
+  private startIntervals() {
+    this.stopIntervals()
 
     this.tickInterval = setInterval(() => {
       this.state = serverReducer(this.state, { type: 'TICK' })
       this.broadcast()
+
+      if (this.state.phase === 'PLAYING' && this.config.mode === 'tug' && this.config.teams.length >= 2) {
+        const teamScores = getTeamScores(this.state, this.config.teams)
+        const total = teamScores.reduce((sum, t) => sum + t.score, 0)
+        if (total >= TUG_MIN_TOTAL_TAPS) {
+          const maxShare = Math.max(...teamScores.map(t => t.score / total))
+          if (maxShare >= TUG_WIN_THRESHOLD) {
+            this.state = serverReducer(this.state, { type: 'FORCE_END' })
+            this.broadcast()
+          }
+        }
+      }
+
       if (this.state.phase === 'RESULTS') {
         this.stopIntervals()
         this.emitLeaderboard()
         const players = Object.values(this.state.players).map(p => ({ name: p.name, score: p.score }))
-        if (players.length > 0) this.saveResults(players)
+        if (players.length > 0 && this.sessionId) this.saveResults(this.sessionId, this.state.currentRound, players)
+        this.maybeScheduleNextRound()
       }
     }, 1000)
 
@@ -152,18 +192,95 @@ export class TapRaceRoom {
     this.scoreInterval = setInterval(() => {
       if (this.state.phase === 'PLAYING') {
         for (const player of Object.values(this.state.players)) {
-          this.io.to(player.id).emit('SCORE_UPDATE', { score: player.score })
+          this.io.to(player.id).emit('SCORE_UPDATE', { score: player.score, eliminated: player.eliminated })
         }
       }
     }, 200)
+
+    this.scheduleFrenzy()
+
+    if (this.config.mode === 'survival') {
+      this.scheduleElimination()
+    }
+  }
+
+  private scheduleFrenzy() {
+    const delay = FRENZY_MIN_DELAY_MS + Math.random() * FRENZY_MAX_EXTRA_MS
+    this.frenzyTimeout = setTimeout(() => {
+      if (this.state.phase !== 'PLAYING') return
+      this.state = serverReducer(this.state, { type: 'FRENZY_START' })
+      this.io.to(this.roomId).emit('FRENZY_STATE', { active: true })
+
+      this.frenzyEndTimeout = setTimeout(() => {
+        this.state = serverReducer(this.state, { type: 'FRENZY_END' })
+        this.io.to(this.roomId).emit('FRENZY_STATE', { active: false })
+        if (this.state.phase === 'PLAYING') this.scheduleFrenzy()
+      }, FRENZY_DURATION_MS)
+    }, delay)
+  }
+
+  private scheduleElimination() {
+    this.eliminationInterval = setInterval(() => {
+      if (this.state.phase !== 'PLAYING') return
+      const active = Object.values(this.state.players).filter(p => !p.eliminated)
+      if (active.length <= 1) return
+      const toEliminate = Math.max(1, Math.floor(active.length * 0.2))
+      const sorted = [...active].sort((a, b) => a.score - b.score)
+      const ids = sorted.slice(0, toEliminate).map(p => p.id)
+      this.state = serverReducer(this.state, { type: 'ELIMINATE', ids })
+      this.io.to(this.roomId).emit('ELIMINATION', { ids })
+      // Si 1 seul survivant reste, fin anticipée : il est vainqueur
+      const remaining = Object.values(this.state.players).filter(p => !p.eliminated)
+      if (remaining.length <= 1 && this.state.phase === 'PLAYING') {
+        this.state = serverReducer(this.state, { type: 'FORCE_END' })
+        this.broadcast()
+      }
+    }, SURVIVAL_INTERVAL_MS)
+  }
+
+  private maybeScheduleNextRound() {
+    if (this.state.currentRound < this.state.totalRounds) {
+      this.nextRoundTimeout = setTimeout(() => {
+        this.nextRoundTimeout = null
+        this.state = serverReducer(this.state, { type: 'NEXT_ROUND', survivorOnly: this.config.mode === 'survival' })
+        this.broadcast()
+        this.startIntervals()
+      }, NEXT_ROUND_DELAY_MS)
+    }
+  }
+
+  private buildStatePayload() {
+    return {
+      phase: this.state.phase,
+      countdown: this.state.countdown,
+      timeLeft: this.state.timeLeft,
+      gameDuration: this.state.gameDuration,
+      frenzy: this.state.frenzy,
+      currentRound: this.state.currentRound,
+      totalRounds: this.state.totalRounds,
+    }
   }
 
   private buildLeaderboardPayload() {
-    const payload: { players: ReturnType<typeof getLeaderboard>; teams?: ReturnType<typeof getTeamScores> } = {
-      players: getLeaderboard(this.state),
+    const isFinalResults = this.state.phase === 'RESULTS' && this.state.currentRound >= this.state.totalRounds
+    const leaderboard = getLeaderboard(this.state, isFinalResults)
+    const players = leaderboard.map(p => ({ ...p, totalScore: totalScore(p) }))
+    const payload: {
+      players: typeof players
+      teams?: ReturnType<typeof getTeamScores>
+      ropePosition?: number
+      isFinalResults?: boolean
+    } = { players }
+
+    if (isFinalResults) payload.isFinalResults = true
+
+    if (this.config.mode === 'team' || this.config.mode === 'tug') {
+      payload.teams = getTeamScores(this.state, this.config.teams, isFinalResults)
     }
-    if (this.config.mode === 'team') {
-      payload.teams = getTeamScores(this.state, this.config.teams)
+    if (this.config.mode === 'tug' && this.config.teams.length >= 2) {
+      const teams = payload.teams!
+      const total = teams.reduce((sum, t) => sum + t.score, 0)
+      payload.ropePosition = total > 0 ? teams[0].score / total : 0.5
     }
     return payload
   }
@@ -173,20 +290,18 @@ export class TapRaceRoom {
   }
 
   private registerSocket(socket: Socket, token: string) {
-    // Anti-empilement : retire nos handlers précédents pour cette socket afin
-    // qu'un re-join (ou un double-clic « Rejoindre ») ne multiplie pas les taps.
     socket.removeAllListeners('TAP_BATCH')
     const prevDisconnect = this.disconnectHandlers.get(socket.id)
     if (prevDisconnect) socket.off('disconnect', prevDisconnect)
 
-    // Plafond glissant : au plus MAX_TAPS_PER_SEC taps comptés par seconde, quel
-    // que soit le count annoncé par le client (le serveur reste autoritaire).
     let windowStart = Date.now()
     let inWindow = 0
     socket.on('TAP_BATCH', (raw: unknown) => {
       const result = TapBatchSchema.safeParse(raw)
       if (!result.success) return
       if (this.state.phase !== 'PLAYING') return
+      const player = this.state.players[socket.id]
+      if (player?.eliminated) return
       const now = Date.now()
       if (now - windowStart >= 1000) {
         windowStart = now
@@ -203,14 +318,13 @@ export class TapRaceRoom {
       const s = this.sessions.get(token)
       if (s) {
         const currentPlayer = this.state.players[socket.id]
-        if (currentPlayer) s.score = currentPlayer.score
+        if (currentPlayer) { s.score = currentPlayer.score; s.cumulativeScore = currentPlayer.cumulativeScore; s.eliminated = currentPlayer.eliminated }
       }
       this.state = serverReducer(this.state, { type: 'PLAYER_LEAVE', id: socket.id })
       this.disconnectHandlers.delete(socket.id)
       this.emitLeaderboard()
       this.broadcastPlayerList()
 
-      // Purge le token de rejoin après un délai de grâce (permet le reconnect mobile)
       const purge = setTimeout(() => {
         if (this.sessions.get(token)?.socketId === socket.id) this.sessions.delete(token)
         this.purgeTimers.delete(token)
@@ -222,7 +336,7 @@ export class TapRaceRoom {
   }
 
   private broadcast() {
-    this.io.to(this.roomId).emit('GAME_STATE', { phase: this.state.phase, countdown: this.state.countdown, timeLeft: this.state.timeLeft })
+    this.io.to(this.roomId).emit('GAME_STATE', this.buildStatePayload())
   }
 
   private broadcastPlayerList() {
@@ -233,7 +347,6 @@ export class TapRaceRoom {
     })
   }
 
-  /** Libère timers et listeners — appelé quand la room est supprimée. */
   dispose() {
     this.stopIntervals()
     this.disconnectHandlers.clear()
@@ -245,6 +358,16 @@ export class TapRaceRoom {
     if (this.tickInterval) clearInterval(this.tickInterval)
     if (this.leaderboardInterval) clearInterval(this.leaderboardInterval)
     if (this.scoreInterval) clearInterval(this.scoreInterval)
-    this.tickInterval = null; this.leaderboardInterval = null; this.scoreInterval = null
+    if (this.frenzyTimeout) clearTimeout(this.frenzyTimeout)
+    if (this.frenzyEndTimeout) clearTimeout(this.frenzyEndTimeout)
+    if (this.eliminationInterval) clearInterval(this.eliminationInterval)
+    if (this.nextRoundTimeout) clearTimeout(this.nextRoundTimeout)
+    this.tickInterval = null
+    this.leaderboardInterval = null
+    this.scoreInterval = null
+    this.frenzyTimeout = null
+    this.frenzyEndTimeout = null
+    this.eliminationInterval = null
+    this.nextRoundTimeout = null
   }
 }

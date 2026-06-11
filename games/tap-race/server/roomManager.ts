@@ -15,7 +15,7 @@ export class RoomManager {
 
   constructor(
     private readonly io: Server,
-    private readonly db?: { saveResults: (players: { name: string; score: number }[]) => void },
+    private readonly db?: { saveResults: (sessionId: string, round: number, players: { name: string; score: number }[]) => void },
     private readonly inactivityTimeoutMs: number = DEFAULT_TIMEOUT_MS,
   ) {
     this.cleanupInterval = setInterval(
@@ -29,7 +29,7 @@ export class RoomManager {
     while (this.rooms.has(code)) code = generateCode()
     const db = this.db
     const saveResultsFn = db
-      ? (players: { name: string; score: number }[]) => db.saveResults(players)
+      ? (sessionId: string, round: number, players: { name: string; score: number }[]) => db.saveResults(sessionId, round, players)
       : () => {}
     this.rooms.set(code, new TapRaceRoom(this.io, code, saveResultsFn, config))
     return code

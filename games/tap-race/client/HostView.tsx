@@ -1,4 +1,6 @@
+import { useState } from 'react'
 import type { HostViewState, LeaderboardEntry, TeamScore } from './types'
+import PartyResultsPanel from './PartyResultsPanel'
 import Confetti from './fx/Confetti'
 import { useCountUp } from './fx/useCountUp'
 import './tap-race.css'
@@ -10,7 +12,6 @@ interface Props {
   onViewGlobalLeaderboard?: () => void
 }
 
-const GAME_DURATION = 60
 const ROW_HEIGHT = 60
 const ROW_STEP = 72
 const delay = (ms: number) => ({ '--d': `${ms}ms` }) as React.CSSProperties
@@ -48,6 +49,10 @@ function WaitingScreen({ state, qrUrl, onStart }: { state: HostViewState; qrUrl?
           <p className="tr-qr__code">{state.roomCode}</p>
           <p className="tr-qr__label">scannez pour rejoindre</p>
         </div>
+      )}
+
+      {state.totalRounds && state.totalRounds > 1 && (
+        <p className="tr-round-badge tr-rise" style={delay(240)}>{state.totalRounds} manches</p>
       )}
 
       {onStart && (
@@ -92,6 +97,9 @@ function CountdownScreen({ state }: { state: HostViewState }) {
   return (
     <div className="tr-screen">
       <div className="tr-ambient" aria-hidden="true" />
+      {state.totalRounds && state.totalRounds > 1 && (
+        <p className="tr-round-badge">Manche {state.currentRound ?? 1}/{state.totalRounds}</p>
+      )}
       <p className="tr-label" style={{ fontSize: '1.3rem' }}>Prêt ?</p>
       <div className="tr-count">
         <span key={state.countdown} className="tr-count__ring" aria-hidden="true" />
@@ -107,23 +115,45 @@ function CountdownScreen({ state }: { state: HostViewState }) {
 /* ---------- PLAYING : timer géant + classement live ---------- */
 
 function PlayingScreen({ state }: { state: HostViewState }) {
+  const gameDuration = state.gameDuration ?? 60
   const danger = state.timeLeft <= 10
+  const frenzy = state.frenzy ?? false
   return (
-    <div className="tr-screen tr-screen--host" data-danger={danger ? 'true' : 'false'}>
-      <div className={`tr-ambient${danger ? ' tr-ambient--danger' : ''}`} aria-hidden="true" />
+    <div
+      className="tr-screen tr-screen--host"
+      data-danger={danger && !frenzy ? 'true' : 'false'}
+      data-frenzy={frenzy ? 'true' : 'false'}
+    >
+      <div className={`tr-ambient${frenzy ? ' tr-ambient--frenzy' : danger ? ' tr-ambient--danger' : ''}`} aria-hidden="true" />
+
+      {frenzy && (
+        <div className="tr-frenzy-banner tr-frenzy-banner--host" aria-live="polite">
+          ⚡ GOLDEN TAP ×2 ⚡
+        </div>
+      )}
 
       <div className="tr-timerzone" style={{ maxWidth: 700 }}>
-        <p className="tr-htimer">{state.timeLeft}s</p>
+        {state.totalRounds && state.totalRounds > 1 && (
+          <p className="tr-round-badge" style={{ marginBottom: '0.4rem' }}>
+            Manche {state.currentRound ?? 1}/{state.totalRounds}
+          </p>
+        )}
+        <p className={`tr-htimer${frenzy ? ' tr-htimer--frenzy' : ''}`}>{state.timeLeft}s</p>
         <div className="tr-timerbar" style={{ height: 9 }}>
           <div
-            className="tr-timerbar__fill"
-            style={{ width: `${Math.max(0, Math.min(100, (state.timeLeft / GAME_DURATION) * 100))}%` }}
+            className={`tr-timerbar__fill${frenzy ? ' tr-timerbar__fill--frenzy' : ''}`}
+            style={{ width: `${Math.max(0, Math.min(100, (state.timeLeft / gameDuration) * 100))}%` }}
           />
         </div>
         <p className="tr-live">En jeu</p>
       </div>
 
-      {state.teams && state.teams.length >= 2 && <TeamBattle teams={state.teams} />}
+      {state.teams && state.teams.length >= 2 && typeof state.ropePosition === 'number'
+        ? <TugRope teams={state.teams} ropePosition={state.ropePosition} />
+        : state.teams && state.teams.length >= 2
+          ? <TeamBattle teams={state.teams} />
+          : null
+      }
 
       <RankedBoard entries={state.leaderboard} teams={state.teams} />
     </div>
@@ -158,23 +188,52 @@ function TeamBattle({ teams }: { teams: TeamScore[] }) {
   )
 }
 
+function TugRope({ teams, ropePosition }: { teams: TeamScore[]; ropePosition: number }) {
+  const [teamA, teamB] = teams
+  const flagPos = Math.max(5, Math.min(95, ropePosition * 100))
+  const aLeads = ropePosition < 0.5
+  return (
+    <div className="tr-tugrope" style={{ width: '100%', maxWidth: 700 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+        <span style={{ fontFamily: 'monospace', fontWeight: 'bold', color: aLeads ? teamA.color : '#555', fontSize: '1.1rem' }}>
+          {teamA.name} {teamA.score}
+        </span>
+        <span style={{ fontFamily: 'monospace', fontWeight: 'bold', color: !aLeads ? teamB.color : '#555', fontSize: '1.1rem' }}>
+          {teamB.score} {teamB.name}
+        </span>
+      </div>
+      <div className="tr-tugrope__track">
+        <div className="tr-tugrope__fill--a" style={{ width: `${flagPos}%`, background: teamA.color }} />
+        <div className="tr-tugrope__flag" style={{ left: `${flagPos}%`, borderColor: aLeads ? teamA.color : teamB.color }}>
+          ⚑
+        </div>
+        <div className="tr-tugrope__fill--b" style={{ width: `${100 - flagPos}%`, background: teamB.color }} />
+      </div>
+    </div>
+  )
+}
+
 function RankedBoard({ entries, teams }: { entries: LeaderboardEntry[]; teams?: TeamScore[] }) {
   if (entries.length === 0) {
     return <p className="tr-empty">En attente de joueurs…</p>
   }
-  const max = Math.max(1, ...entries.map(e => e.score))
+  const activeEntries = entries.filter(e => !e.eliminated)
+  const eliminatedEntries = entries.filter(e => e.eliminated)
+  const sorted = [...activeEntries, ...eliminatedEntries]
+  const max = Math.max(1, ...sorted.map(e => e.score))
   return (
-    <div className="tr-board" style={{ height: entries.length * ROW_STEP - (ROW_STEP - ROW_HEIGHT) }}>
-      {entries.map((e, i) => {
+    <div className="tr-board" style={{ height: sorted.length * ROW_STEP - (ROW_STEP - ROW_HEIGHT) }}>
+      {sorted.map((e, i) => {
         const team = teams?.find(t => t.id === e.teamId)
+        const isElim = e.eliminated ?? false
         return (
           <div
             key={e.id}
-            className={`tr-boardrow${i === 0 && e.score > 0 ? ' tr-boardrow--lead' : ''}`}
+            className={`tr-boardrow${i === 0 && e.score > 0 && !isElim ? ' tr-boardrow--lead' : ''}${isElim ? ' tr-boardrow--eliminated' : ''}`}
             style={{ transform: `translateY(${i * ROW_STEP}px)`, borderLeft: team ? `3px solid ${team.color}` : undefined }}
           >
             <div className="tr-boardrow__bar" style={{ width: `${(e.score / max) * 100}%` }} aria-hidden="true" />
-            <span className={`tr-rank${i < 3 ? ` tr-rank--${i + 1}` : ''}`}>{i + 1}</span>
+            <span className={`tr-rank${!isElim && i < 3 ? ` tr-rank--${i + 1}` : ''}`}>{isElim ? '✕' : i + 1}</span>
             <span className="tr-boardrow__name">{e.name}</span>
             <AnimatedScore value={e.score} />
           </div>
@@ -195,29 +254,47 @@ const PODIUM_HEIGHTS = ['clamp(160px, 26vh, 240px)', 'clamp(110px, 18vh, 170px)'
 const PODIUM_DELAYS = [850, 450, 100]
 
 function ResultsScreen({ state, onViewGlobalLeaderboard }: { state: HostViewState; onViewGlobalLeaderboard?: () => void }) {
+  const [showParty, setShowParty] = useState(false)
   const medals = state.leaderboard.slice(0, 3)
   const rest = state.leaderboard.slice(3)
-  // ordre d'affichage scénique : 2e — 1er — 3e
   const slots = [medals[1], medals[0], medals[2]]
   const ranks = [2, 1, 3]
+  const isLastRound = state.isFinalResults || !state.totalRounds || !state.currentRound || state.currentRound >= state.totalRounds
+  const hasMoreRounds = !state.isFinalResults && state.totalRounds && state.currentRound && state.currentRound < state.totalRounds
+  const entryScore = (e: LeaderboardEntry) => state.isFinalResults ? (e.totalScore ?? e.score) : e.score
+
+  if (showParty && state.roundSnapshots) {
+    return (
+      <PartyResultsPanel
+        snapshots={state.roundSnapshots}
+        finalLeaderboard={state.leaderboard}
+        onClose={() => setShowParty(false)}
+      />
+    )
+  }
 
   return (
     <div className="tr-screen tr-screen--host" style={{ justifyContent: 'center' }}>
       <div className="tr-ambient" aria-hidden="true" />
       <div className="tr-gridfloor" aria-hidden="true" />
-      <Confetti delay={1100} />
+      {isLastRound && <Confetti delay={1100} />}
 
-      <p className="tr-kicker tr-rise">/// course terminée ///</p>
+      <p className="tr-kicker tr-rise">/// {hasMoreRounds ? `fin manche ${state.currentRound}` : 'course terminée'} ///</p>
+
       {state.teams && state.teams.length >= 2 ? (() => {
-        const winner = state.teams.reduce((a, b) => a.score >= b.score ? a : b)
+        const winner = state.teams!.reduce((a, b) => a.score >= b.score ? a : b)
         return (
           <div className="tr-rise" style={{ ...delay(80), textAlign: 'center' }}>
-            <p style={{ margin: '0 0 0.3rem', fontSize: '1rem', color: '#aaa', fontFamily: 'monospace' }}>équipe gagnante</p>
-            <h2 style={{ margin: 0, fontSize: 'clamp(2.2rem, 8vmin, 4rem)', fontWeight: 'bold', color: winner.color }}>
-              🏆 {winner.name}
-            </h2>
+            {isLastRound && (
+              <>
+                <p style={{ margin: '0 0 0.3rem', fontSize: '1rem', color: '#aaa', fontFamily: 'monospace' }}>équipe gagnante</p>
+                <h2 style={{ margin: 0, fontSize: 'clamp(2.2rem, 8vmin, 4rem)', fontWeight: 'bold', color: winner.color }}>
+                  🏆 {winner.name}
+                </h2>
+              </>
+            )}
             <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', marginTop: '0.5rem' }}>
-              {state.teams.map(t => (
+              {state.teams!.map(t => (
                 <span key={t.id} style={{ fontFamily: 'monospace', color: t.id === winner.id ? t.color : '#555', fontSize: '1rem' }}>
                   {t.name} {t.score}
                 </span>
@@ -227,7 +304,7 @@ function ResultsScreen({ state, onViewGlobalLeaderboard }: { state: HostViewStat
         )
       })() : (
         <h2 className="tr-logo tr-rise" style={{ ...delay(80), fontSize: 'clamp(2rem, 6vmin, 3.6rem)' }}>
-          Résultats finaux
+          {hasMoreRounds ? `Manche ${state.currentRound}/${state.totalRounds}` : 'Résultats finaux'}
         </h2>
       )}
 
@@ -243,7 +320,7 @@ function ResultsScreen({ state, onViewGlobalLeaderboard }: { state: HostViewStat
                 style={delay(PODIUM_DELAYS[i])}
               >
                 <p className="tr-podium__name">{entry.name}</p>
-                <p className="tr-podium__score">{entry.score}</p>
+                <p className="tr-podium__score">{entryScore(entry)}</p>
                 <div className="tr-podium__col" style={{ height: PODIUM_HEIGHTS[ranks[i] - 1] }}>
                   {ranks[i]}
                 </div>
@@ -259,14 +336,25 @@ function ResultsScreen({ state, onViewGlobalLeaderboard }: { state: HostViewStat
             <li key={e.id} className="tr-resultrow" style={delay(1100 + i * 90)}>
               <span className="tr-rank">{i + 4}</span>
               <span className="tr-resultrow__name">{e.name}</span>
-              <span className="tr-resultrow__score">{e.score}</span>
+              <span className="tr-resultrow__score">{entryScore(e)}</span>
             </li>
           ))}
         </ol>
       )}
 
-      {onViewGlobalLeaderboard && (
-        <button className="tr-ghostbtn tr-rise" style={delay(1400)} onClick={onViewGlobalLeaderboard}>
+      {hasMoreRounds && (
+        <p className="tr-hint tr-rise" style={delay(500)}>
+          Prochaine manche dans quelques secondes…
+        </p>
+      )}
+
+      {isLastRound && state.roundSnapshots && state.roundSnapshots.length > 0 && (
+        <button className="tr-ghostbtn tr-rise" style={delay(1300)} onClick={() => setShowParty(true)}>
+          Score de la partie
+        </button>
+      )}
+      {isLastRound && onViewGlobalLeaderboard && (
+        <button className="tr-ghostbtn tr-rise" style={delay(1450)} onClick={onViewGlobalLeaderboard}>
           Voir score global
         </button>
       )}

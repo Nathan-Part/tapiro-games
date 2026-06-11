@@ -1010,6 +1010,226 @@
   transform: scale(0.97);
 }
 
+/* ============================================================
+   GOLDEN TAP — frenzy
+   ============================================================ */
+.tr-ambient--frenzy {
+  background:
+    radial-gradient(40rem 40rem at 10% -10%, rgba(255, 200, 61, 0.18), transparent 62%),
+    radial-gradient(46rem 44rem at 108% 112%, rgba(255, 140, 0, 0.2), transparent 60%),
+    var(--tr-bg);
+}
+
+[data-frenzy='true'] .tr-timerbar__fill,
+.tr-timerbar__fill--frenzy {
+  background: linear-gradient(90deg, #ff8c00, var(--tr-gold));
+  box-shadow: 0 0 18px rgba(255, 200, 61, 0.7);
+}
+
+[data-frenzy='true'] .tr-timer,
+.tr-timer--frenzy {
+  color: var(--tr-gold);
+  text-shadow: 0 0 18px rgba(255, 200, 61, 0.85);
+  animation: trFrenzyPulse 0.6s ease-in-out infinite;
+}
+
+[data-frenzy='true'] .tr-htimer,
+.tr-htimer--frenzy {
+  color: var(--tr-gold);
+  text-shadow: 0 0 26px rgba(255, 200, 61, 0.7), 0 0 80px rgba(255, 200, 61, 0.35);
+  animation: trFrenzyPulse 0.6s ease-in-out infinite;
+}
+
+.tr-score--frenzy {
+  color: var(--tr-gold);
+  text-shadow:
+    0 0 18px rgba(255, 200, 61, 0.9),
+    0 0 60px rgba(255, 200, 61, 0.4),
+    0 0 110px rgba(255, 140, 0, 0.4);
+}
+
+.tr-frenzy-banner {
+  position: absolute;
+  top: 0.8rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  padding: 0.4rem 1.4rem;
+  border-radius: 99px;
+  background: rgba(255, 200, 61, 0.12);
+  border: 1px solid rgba(255, 200, 61, 0.55);
+  color: var(--tr-gold);
+  font-family: var(--tr-display);
+  font-weight: 800;
+  font-size: clamp(0.85rem, 3.5vw, 1.1rem);
+  letter-spacing: 0.1em;
+  text-shadow: 0 0 14px rgba(255, 200, 61, 0.8);
+  white-space: nowrap;
+  animation: trFrenzyBanner 0.35s var(--tr-spring) both, trFrenzyFlash 0.9s ease-in-out infinite;
+}
+
+.tr-frenzy-banner--host {
+  font-size: clamp(1rem, 2.5vmin, 1.5rem);
+  padding: 0.5rem 2rem;
+  top: 1rem;
+}
+
+@keyframes trFrenzyBanner {
+  from { opacity: 0; transform: translateX(-50%) scale(0.8) translateY(-12px); }
+}
+
+@keyframes trFrenzyFlash {
+  0%, 100% { box-shadow: 0 0 18px rgba(255, 200, 61, 0.3); }
+  50% { box-shadow: 0 0 36px rgba(255, 200, 61, 0.65); }
+}
+
+@keyframes trFrenzyPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.06); }
+}
+
+/* ============================================================
+   SURVIE — joueur éliminé
+   ============================================================ */
+.tr-boardrow--eliminated {
+  opacity: 0.38;
+}
+
+.tr-boardrow--eliminated .tr-boardrow__name {
+  text-decoration: line-through;
+  color: var(--tr-ink-faint);
+}
+
+.tr-boardrow--eliminated .tr-boardrow__score {
+  color: var(--tr-ink-faint);
+}
+
+.tr-eliminated-overlay {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 1.8rem 2.4rem;
+  border-radius: 20px;
+  background: rgba(255, 56, 96, 0.08);
+  border: 2px solid rgba(255, 56, 96, 0.4);
+  box-shadow: 0 0 36px rgba(255, 56, 96, 0.18);
+  animation: trRise 0.5s var(--tr-spring) both;
+}
+
+.tr-eliminated-text {
+  margin: 0;
+  font-family: var(--tr-display);
+  font-weight: 900;
+  font-size: clamp(2.4rem, 12vw, 4rem);
+  letter-spacing: 0.18em;
+  color: var(--tr-danger);
+  text-shadow: 0 0 26px rgba(255, 56, 96, 0.75);
+  animation: trUrgent 0.7s ease-in-out infinite;
+}
+
+/* ============================================================
+   MANCHES — indicateur de round
+   ============================================================ */
+.tr-round-badge {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  padding: 0.22rem 0.9rem;
+  border-radius: 99px;
+  font-family: var(--tr-term);
+  font-size: 0.78rem;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: var(--tr-cyan);
+  background: rgba(0, 245, 255, 0.06);
+  border: 1px solid rgba(0, 245, 255, 0.25);
+}
+
+/* ============================================================
+   TIR À LA CORDE
+   ============================================================ */
+.tr-tugrope {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.tr-tugrope__track {
+  position: relative;
+  display: flex;
+  height: 16px;
+  border-radius: 99px;
+  overflow: visible;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.tr-tugrope__fill--a,
+.tr-tugrope__fill--b {
+  height: 100%;
+  transition: width 0.35s ease;
+  opacity: 0.7;
+}
+
+.tr-tugrope__fill--a { border-radius: 99px 0 0 99px; }
+.tr-tugrope__fill--b { border-radius: 0 99px 99px 0; }
+
+.tr-tugrope__flag {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--tr-bg);
+  border: 2px solid;
+  font-size: 0.9rem;
+  transition: left 0.35s ease, border-color 0.35s ease;
+  box-shadow: 0 0 14px rgba(0, 0, 0, 0.5);
+}
+
+/* ---------- panel résultats par manche ---------- */
+.tr-party-panel {
+  position: fixed; inset: 0; z-index: 200;
+  background: var(--tr-bg);
+  display: flex; flex-direction: column; gap: 1rem;
+  padding: 1.4rem clamp(1rem, 4vw, 2.5rem);
+  overflow: hidden;
+}
+.tr-party-panel__head {
+  display: flex; justify-content: space-between; align-items: center;
+}
+.tr-party-panel__tabs {
+  display: flex; gap: 0.5rem; flex-wrap: wrap;
+}
+.tr-round-tab {
+  padding: 0.45rem 1.2rem;
+  border: 1px solid rgba(0, 245, 255, 0.22); border-radius: 20px;
+  background: transparent; color: var(--tr-ink-faint);
+  cursor: pointer; font-family: var(--tr-display); font-size: 0.8rem; letter-spacing: 0.04em;
+  transition: all 0.15s;
+}
+.tr-round-tab:hover { border-color: rgba(0, 245, 255, 0.6); color: var(--tr-ink); }
+.tr-round-tab--active {
+  background: rgba(0, 245, 255, 0.12); border-color: var(--tr-cyan);
+  color: var(--tr-cyan); box-shadow: 0 0 12px rgba(0, 245, 255, 0.25);
+}
+.tr-round-tab--final { border-color: rgba(255, 200, 61, 0.25); }
+.tr-round-tab--final.tr-round-tab--active {
+  background: rgba(255, 200, 61, 0.1); border-color: var(--tr-gold);
+  color: var(--tr-gold); box-shadow: 0 0 12px rgba(255, 200, 61, 0.25);
+}
+.tr-party-panel__list {
+  list-style: none; padding: 0; margin: 0;
+  display: flex; flex-direction: column; gap: 0.5rem;
+  overflow-y: auto; flex: 1;
+}
+
 /* ---------- accessibilité ---------- */
 @media (prefers-reduced-motion: reduce) {
   .tr-screen *,

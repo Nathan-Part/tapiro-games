@@ -153,10 +153,14 @@ export function createApp(dbPath = process.env.DB_PATH ?? './arcade.db') {
         const chunks: Buffer[] = []
         req.on('data', (chunk: Buffer) => chunks.push(chunk))
         req.on('end', () => {
-          let config: { mode: 'solo' | 'team'; teams: { id: string; name: string; color: string }[] } = { mode: 'solo', teams: [] }
+          let config: { mode: 'solo' | 'team' | 'survival' | 'tug'; teams: { id: string; name: string; color: string }[]; rounds?: number; duration?: number } = { mode: 'solo', teams: [] }
           try {
             const body = JSON.parse(Buffer.concat(chunks).toString())
-            if (body.mode === 'team' && Array.isArray(body.teams)) config = { mode: 'team', teams: body.teams }
+            const mode = ['solo', 'team', 'survival', 'tug'].includes(body.mode) ? body.mode : 'solo'
+            const teams = (mode === 'team' || mode === 'tug') && Array.isArray(body.teams) ? body.teams : []
+            const rounds = Number.isInteger(body.rounds) && body.rounds >= 1 && body.rounds <= 5 ? body.rounds : 1
+            const duration = Number.isInteger(body.duration) && body.duration >= 5 && body.duration <= 300 ? body.duration : 60
+            config = { mode, teams, rounds, duration }
           } catch {}
           const code = manager.create(config)
           const hostToken = manager.get(code)?.hostToken
@@ -213,7 +217,7 @@ export function createApp(dbPath = process.env.DB_PATH ?? './arcade.db') {
   }
 
   manager = new RoomManager(io, {
-    saveResults: (players) => saveResults(db, players),
+    saveResults: (sessionId, round, players) => saveResults(db, sessionId, round, players),
   })
 
   io.on('connection', (socket) => {

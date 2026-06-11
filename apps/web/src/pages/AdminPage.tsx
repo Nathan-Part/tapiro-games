@@ -15,8 +15,11 @@ export default function AdminPage() {
   const creatingRef = useRef(false)
   const [copied, setCopied] = useState<string | null>(null)
   const [showCreateForm, setShowCreateForm] = useState(false)
-  const [newMode, setNewMode] = useState<'solo' | 'team'>('solo')
+  const [newMode, setNewMode] = useState<'solo' | 'team' | 'survival' | 'tug'>('solo')
   const [teamNames, setTeamNames] = useState(['Équipe Rouge', 'Équipe Bleue'])
+  const [isTug, setIsTug] = useState(false)
+  const [rounds, setRounds] = useState(1)
+  const [duration, setDuration] = useState(60)
 
   useEffect(() => {
     const saved = sessionStorage.getItem('admin-token')
@@ -58,12 +61,17 @@ export default function AdminPage() {
     creatingRef.current = true
     setCreating(true)
     setShowCreateForm(false)
-    const config = newMode === 'team'
-      ? { mode: 'team' as const, teams: [
-          { id: 'red', name: teamNames[0] || 'Équipe 1', color: '#dc2626' },
-          { id: 'blue', name: teamNames[1] || 'Équipe 2', color: '#2563eb' },
-        ]}
-      : { mode: 'solo' as const, teams: [] }
+    const effectiveMode = newMode === 'team' && isTug ? 'tug' : newMode
+    const needsTeams = effectiveMode === 'team' || effectiveMode === 'tug'
+    const config = {
+      mode: effectiveMode,
+      teams: needsTeams ? [
+        { id: 'red', name: teamNames[0] || 'Équipe 1', color: '#dc2626' },
+        { id: 'blue', name: teamNames[1] || 'Équipe 2', color: '#2563eb' },
+      ] : [],
+      rounds,
+      duration,
+    }
     try {
       const res = await fetch(`${API}/api/admin/rooms`, {
         method: 'POST',
@@ -78,6 +86,9 @@ export default function AdminPage() {
       setCreating(false)
       setNewMode('solo')
       setTeamNames(['Équipe Rouge', 'Équipe Bleue'])
+      setIsTug(false)
+      setRounds(1)
+      setDuration(60)
     }
   }
 
@@ -165,31 +176,62 @@ export default function AdminPage() {
           {showCreateForm && (
             <div style={s.createForm}>
               <p className="arc-label" style={{ marginBottom: '0.6rem' }}>Type de partie</p>
-              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
-                {(['solo', 'team'] as const).map(m => (
+              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
+                {([['solo', 'Solo'], ['team', 'Équipes'], ['survival', 'Survie']] as const).map(([m, label]) => (
                   <button
                     key={m}
                     style={{ ...s.modeBtn, ...(newMode === m ? s.modeBtnActive : {}) }}
-                    onClick={() => setNewMode(m)}
+                    onClick={() => { setNewMode(m); if (m !== 'team') setIsTug(false) }}
                   >
-                    {m === 'solo' ? 'Solo' : 'Équipes'}
+                    {label}
                   </button>
                 ))}
               </div>
               {newMode === 'team' && (
-                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
-                  {[0, 1].map(i => (
-                    <input
-                      key={i}
-                      className="arc-input"
-                      style={{ flex: 1, borderLeft: `3px solid ${i === 0 ? '#dc2626' : '#2563eb'}` }}
-                      value={teamNames[i]}
-                      onChange={e => setTeamNames(prev => prev.map((n, j) => j === i ? e.target.value : n))}
-                      placeholder={`Équipe ${i + 1}`}
-                    />
-                  ))}
-                </div>
+                <>
+                  <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                    {[0, 1].map(i => (
+                      <input
+                        key={i}
+                        className="arc-input"
+                        style={{ flex: 1, borderLeft: `3px solid ${i === 0 ? '#dc2626' : '#2563eb'}` }}
+                        value={teamNames[i]}
+                        onChange={e => setTeamNames(prev => prev.map((n, j) => j === i ? e.target.value : n))}
+                        placeholder={`Équipe ${i + 1}`}
+                      />
+                    ))}
+                  </div>
+                  <label style={s.checkLabel}>
+                    <input type="checkbox" checked={isTug} onChange={e => setIsTug(e.target.checked)} style={{ accentColor: '#a855f7' }} />
+                    <span>Tir à la corde</span>
+                    <span style={s.checkHint}>⚑ fin anticipée si 80 % des taps</span>
+                  </label>
+                </>
               )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.75rem' }}>
+                <p className="arc-label" style={{ margin: 0, whiteSpace: 'nowrap' }}>Durée / manche</p>
+                {([15, 30, 60, 90, 120] as const).map(n => (
+                  <button
+                    key={n}
+                    style={{ ...s.modeBtn, flex: 'none', padding: '0.4rem 0.6rem', ...(duration === n ? s.modeBtnActive : {}) }}
+                    onClick={() => setDuration(n)}
+                  >
+                    {n}s
+                  </button>
+                ))}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.75rem' }}>
+                <p className="arc-label" style={{ margin: 0, whiteSpace: 'nowrap' }}>Manches</p>
+                {[1, 2, 3].map(n => (
+                  <button
+                    key={n}
+                    style={{ ...s.modeBtn, width: '2.4rem', padding: '0.4rem', ...(rounds === n ? s.modeBtnActive : {}) }}
+                    onClick={() => setRounds(n)}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
               <div style={{ display: 'flex', gap: '0.5rem' }}>
                 <button className="arc-btn arc-btn-primary arc-btn--sm" onClick={createRoom}>Créer</button>
                 <button className="arc-btn arc-btn-ghost arc-btn--sm" onClick={() => setShowCreateForm(false)}>Annuler</button>
@@ -215,6 +257,8 @@ export default function AdminPage() {
                       {room.phase === 'RESULTS' && '✓ Terminée'}
                     </span>
                     {room.mode === 'team' && <span style={s.badgeTeam}>👥 Équipes</span>}
+                    {room.mode === 'survival' && <span style={s.badgeSurvival}>💀 Survie</span>}
+                    {room.mode === 'tug' && <span style={s.badgeTug}>⚑ Tir corde</span>}
                     <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginLeft: 'auto' }}>
                       <button
                         className="arc-btn arc-btn-ghost arc-btn--sm"
@@ -286,4 +330,19 @@ const s: Record<string, React.CSSProperties> = {
     background: 'rgba(74,222,128,0.15)', color: '#4ade80',
     border: '1px solid rgba(74,222,128,0.3)',
   },
+  badgeSurvival: {
+    fontSize: '0.75rem', padding: '0.2em 0.5em', borderRadius: 99,
+    background: 'rgba(239,68,68,0.1)', color: '#ef4444',
+    fontFamily: 'monospace', whiteSpace: 'nowrap' as const,
+  },
+  badgeTug: {
+    fontSize: '0.75rem', padding: '0.2em 0.5em', borderRadius: 99,
+    background: 'rgba(168,85,247,0.1)', color: '#a855f7',
+    fontFamily: 'monospace', whiteSpace: 'nowrap' as const,
+  },
+  checkLabel: {
+    display: 'flex', alignItems: 'center', gap: '0.5rem',
+    marginBottom: '0.75rem', cursor: 'pointer', fontSize: '0.9rem', color: '#ccc',
+  },
+  checkHint: { color: '#666', fontSize: '0.75rem', fontFamily: 'monospace' },
 }

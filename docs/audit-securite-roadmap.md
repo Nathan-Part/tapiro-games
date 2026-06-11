@@ -110,20 +110,29 @@ pré-existantes : boutons sans `type`, commentaires `///` de design, `!` dans le
 
 ---
 
-## ⬜ À faire — améliorations produit (brainstorm PM)
-
-Aucune entamée. Détail/raisonnement complet dans l'historique de la session d'audit. Résumé :
+## ✅ Fait — améliorations produit (Block A Gameplay — session 2026-06-11)
 
 ### A. Gameplay
-- **Golden Tap** *(Facile / Fort)* — fenêtre aléatoire de 5 s où les taps valent ×2. La room (impure) tire le
-  hasard et dispatche un event `FRENZY_START` ; le reducer reste pur. Gros effet de spectacle pour un coût minime.
-- **Mode Survie / élimination** *(Moyen / Fort)* — toutes les 10 s, les plus faibles sont éliminés. Nouveau
-  `mode` dans `RoomConfig`, flag `eliminated` sur `PlayerRecord`.
-- **Power-ups / sabotage** *(Complexe / Fort)* — geler/brouiller/voler le leader. Events `POWERUP_EARNED` /
-  `POWERUP_USE` validés serveur. **Dépend de la borne anti-triche (V1).**
-- **Tir à la corde** *(Moyen / Moyen-Fort)* — extension du mode équipe existant : position de corde selon le
-  différentiel net de taps ; peut finir avant 60 s.
-- **Décroissance du score** *(Facile / Moyen)* — le score baisse si on arrête de taper (quelques lignes dans `TICK`).
+- **Golden Tap** ✅ — `FRENZY_START/END` dans le reducer ; room tire le délai aléatoire (12-25 s), frenzy dure 5 s
+  puis se reprogramme. Multiplier ×2 dans `TAP_BATCH`. Visuel : ambient doré, banner `⚡ GOLDEN TAP ×2`, timer doré.
+- **Décroissance du score** ✅ — dans le `TICK` reducer (PLAYING) : `ticksSinceLastTap++` ; après 3 s sans tap
+  le score perd 1 pt/s. Un tap remet le compteur à zéro. Score plancher = 0.
+- **Plusieurs manches** ✅ — `rounds?: number` dans `RoomConfig` (1-5). État `currentRound/totalRounds` dans
+  `ServerGameState`. Après RESULTS : si `currentRound < totalRounds`, la room attend 5 s puis dispatch `NEXT_ROUND`
+  (→ COUNTDOWN direct, scores remis à 0, éliminés réhabilités). Admin UI : sélecteur 1/2/3 manches.
+- **Mode Survie / élimination** ✅ — `mode: 'survival'` dans `RoomConfig`. `eliminated: boolean` sur `PlayerRecord`
+  + session. Toutes les 10 s : 20 % des joueurs actifs les moins bien classés sont éliminés (min 1). Éliminés :
+  taps ignorés, decay ignorée, affichage barré côté hôte, overlay ÉLIMINÉ côté joueur.
+- **Tir à la corde** ✅ — `mode: 'tug'`. Fin anticipée si une équipe dépasse 80 % des taps (min 30 taps total)
+  via `FORCE_END`. `ropePosition` (0-1) dans le payload leaderboard. Visualisation corde animée côté hôte.
+- **Power-ups / sabotage** *(Complexe / Fort)* — non fait. Dépend de l'identité persistante (B).
+
+### Ordre conseillé pour reprendre
+1. **V7** (1 commande, ferme le dernier point d'audit ouvert simple).
+2. **Game-feel mobile (C)** — `navigator.vibrate`, Wake Lock, sons WebAudio. Court chemin vers « démo qui claque ».
+3. Puis **identité persistante (B)** qui débloque tout l'axe rétention.
+
+## ⬜ À faire — améliorations produit
 
 ### B. Engagement & rétention
 - **Identité persistante (`playerId`)** *(Moyen / Fort — socle)* — UUID durable côté client envoyé au `JOIN_ROOM`,
@@ -143,11 +152,5 @@ Aucune entamée. Détail/raisonnement complet dans l'historique de la session d'
 - **État de reconnexion visible** *(Facile)* — bandeau sur les events `disconnect`/`reconnect`.
 - **`prefers-reduced-motion`** *(Facile)* — atténuer `ParticleField`/animations (a11y + perf).
 
----
-
-## Ordre conseillé pour reprendre
-1. **V7** (1 commande, ferme le dernier point d'audit ouvert simple).
-2. Combo démo : **Golden Tap (A) + game-feel mobile (C) + volatile WS (C)** — court chemin entre « sécurisé » et « démo qui claque ».
-3. Puis **identité persistante (B)** qui débloque tout l'axe rétention.
 
 > Les correctifs de sécurité de cette session sont dans l'arbre de travail (non commités au moment de l'écriture).
