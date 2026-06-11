@@ -48,16 +48,20 @@ export interface PlayerStats {
 }
 
 export function getPlayerStats(db: Database.Database, name: string): PlayerStats | null {
-  const rows = db
-    .prepare('SELECT score, playedAt FROM scores WHERE name = ? ORDER BY playedAt DESC')
+  // agrégats calculés en SQL sur tout l'historique (évite Math.max(...n) qui
+  // peut déborder la pile), liste limitée pour borner la taille de réponse.
+  const agg = db
+    .prepare('SELECT COUNT(*) AS gamesPlayed, MAX(score) AS bestScore, AVG(score) AS avgScore FROM scores WHERE name = ?')
+    .get(name) as { gamesPlayed: number; bestScore: number | null; avgScore: number | null }
+  if (!agg || agg.gamesPlayed === 0) return null
+  const history = db
+    .prepare('SELECT score, playedAt FROM scores WHERE name = ? ORDER BY playedAt DESC LIMIT 100')
     .all(name) as { score: number; playedAt: string }[]
-  if (rows.length === 0) return null
-  const scores = rows.map(r => r.score)
   return {
     name,
-    gamesPlayed: rows.length,
-    bestScore: Math.max(...scores),
-    avgScore: Math.round(scores.reduce((a, b) => a + b, 0) / scores.length),
-    history: rows,
+    gamesPlayed: agg.gamesPlayed,
+    bestScore: agg.bestScore ?? 0,
+    avgScore: Math.round(agg.avgScore ?? 0),
+    history,
   }
 }

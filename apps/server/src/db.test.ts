@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import Database from 'better-sqlite3'
-import { createDb, saveResults, getTopScores } from './db'
+import { createDb, saveResults, getTopScores, getPlayerStats } from './db'
 
 describe('db', () => {
   let db: ReturnType<typeof createDb>
@@ -43,5 +43,17 @@ describe('db', () => {
     expect(entry).toHaveProperty('name')
     expect(entry).toHaveProperty('score')
     expect(entry).toHaveProperty('playedAt')
+  })
+
+  it('getPlayerStats agrège sur tout l’historique mais limite la liste à 100', () => {
+    for (let i = 0; i < 150; i++) saveResults(db, [{ name: 'Alice', score: i }])
+    const stats = getPlayerStats(db, 'Alice')!
+    expect(stats.gamesPlayed).toBe(150)
+    expect(stats.bestScore).toBe(149)
+    expect(stats.history.length).toBeLessThanOrEqual(100)
+  })
+
+  it('getPlayerStats retourne null pour un joueur inconnu', () => {
+    expect(getPlayerStats(db, 'Inconnu')).toBeNull()
   })
 })

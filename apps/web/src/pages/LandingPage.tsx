@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { ROOM_CODE_LENGTH } from '@arcade/shared'
 import ParticleField from '../components/ParticleField'
 
 const delay = (ms: number) => ({ '--d': `${ms}ms` }) as React.CSSProperties
@@ -7,7 +8,7 @@ const delay = (ms: number) => ({ '--d': `${ms}ms` }) as React.CSSProperties
 export default function LandingPage() {
   const navigate = useNavigate()
   const [code, setCode] = useState('')
-  const isAdmin = !!localStorage.getItem('admin-token')
+  const isAdmin = !!sessionStorage.getItem('admin-token')
 
   function joinRoom() {
     const trimmed = code.trim().toUpperCase()
@@ -45,7 +46,7 @@ export default function LandingPage() {
               value={code}
               onChange={e => setCode(e.target.value.toUpperCase())}
               onKeyDown={e => e.key === 'Enter' && joinRoom()}
-              maxLength={4}
+              maxLength={ROOM_CODE_LENGTH}
               autoCapitalize="characters"
               autoComplete="off"
               spellCheck={false}

@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import QRCode from 'qrcode'
@@ -19,11 +20,13 @@ export default function HostPage() {
   const [notFound, setNotFound] = useState(false)
 
   useEffect(() => {
-    QRCode.toDataURL(`${window.location.origin}/play/${code}`, { width: 400 }).then(setQrUrl)
+    // inclut la base Vite (/tapi/) sinon le QR pointe vers une route inexistante
+    QRCode.toDataURL(`${window.location.origin}${import.meta.env.BASE_URL}play/${code}`, { width: 400 }).then(setQrUrl)
   }, [code])
 
   useEffect(() => {
-    const doHost = () => socket.emit('HOST_ROOM', { code })
+    const hostToken = code ? sessionStorage.getItem(`host-token-${code}`) : null
+    const doHost = () => socket.emit('HOST_ROOM', { code, token: hostToken })
     if (socket.connected) { doHost() } else { socket.once('connect', doHost); socket.connect() }
     socket.once('ERROR', () => setNotFound(true))
     socket.on('GAME_STATE', (d: { phase: Phase; countdown?: number; timeLeft?: number }) => {
@@ -50,7 +53,7 @@ export default function HostPage() {
     <HostView
       state={state}
       qrUrl={qrUrl}
-      onStart={() => socket.emit('START_GAME', { code })}
+      onStart={() => socket.emit('START_GAME', { code, token: code ? sessionStorage.getItem(`host-token-${code}`) : null })}
       onViewGlobalLeaderboard={() => navigate('/leaderboard')}
     />
   )

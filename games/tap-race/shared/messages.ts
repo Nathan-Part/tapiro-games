@@ -1,6 +1,8 @@
 import { z } from 'zod'
 
-export const TapBatchSchema = z.object({ count: z.number().int().min(0) })
+// max borné : un batch (flush 200 ms) ne porte jamais autant de taps en
+// pratique ; bloque les valeurs absurdes. Le débit réel est plafonné côté room.
+export const TapBatchSchema = z.object({ count: z.number().int().min(0).max(500) })
 export const ScoreUpdateSchema = z.object({ score: z.number().int().min(0) })
 export const LeaderboardEntrySchema = z.object({
   id: z.string(),

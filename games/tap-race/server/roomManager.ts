@@ -1,11 +1,12 @@
 import type { Server } from 'socket.io'
+import { ROOM_CODE_LENGTH } from '@arcade/shared'
 import { TapRaceRoom, type RoomConfig } from './tapRaceRoom'
 
 const DEFAULT_TIMEOUT_MS = 30 * 60 * 1000
 
 function generateCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
-  return Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
+  return Array.from({ length: ROOM_CODE_LENGTH }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
 }
 
 export class RoomManager {
@@ -42,11 +43,12 @@ export class RoomManager {
     return [...this.rooms.keys()]
   }
 
-  listWithStatus(): { code: string; phase: string; playerCount: number; mode: string }[] {
-    return [...this.rooms.entries()].map(([code, room]) => ({ code, ...room.getStatus() }))
+  listWithStatus(): { code: string; phase: string; playerCount: number; mode: string; hostToken: string }[] {
+    return [...this.rooms.entries()].map(([code, room]) => ({ code, ...room.getStatus(), hostToken: room.hostToken }))
   }
 
   delete(code: string): boolean {
+    this.rooms.get(code)?.dispose()
     return this.rooms.delete(code)
   }
 
@@ -58,6 +60,7 @@ export class RoomManager {
     const now = Date.now()
     for (const [code, room] of this.rooms) {
       if (now - room.lastActivity > this.inactivityTimeoutMs) {
+        room.dispose()
         this.rooms.delete(code)
       }
     }

@@ -31,7 +31,7 @@ export default function LeaderboardPage() {
 
   useEffect(() => {
     fetch(`${API}/api/leaderboard`)
-      .then(r => r.json())
+      .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() })
       .then((data: ScoreEntry[]) => { setScores(data); setLoading(false) })
       .catch(() => { setError('Impossible de charger le classement'); setLoading(false) })
   }, [])
@@ -40,6 +40,7 @@ export default function LeaderboardPage() {
     setLoadingPlayer(true)
     try {
       const res = await fetch(`${API}/api/players/${encodeURIComponent(name)}`)
+      if (!res.ok) return
       const data: PlayerStats = await res.json()
       setSelected(data)
     } finally {

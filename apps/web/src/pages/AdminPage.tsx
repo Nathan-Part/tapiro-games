@@ -19,7 +19,7 @@ export default function AdminPage() {
   const [teamNames, setTeamNames] = useState(['Équipe Rouge', 'Équipe Bleue'])
 
   useEffect(() => {
-    const saved = localStorage.getItem('admin-token')
+    const saved = sessionStorage.getItem('admin-token')
     if (saved) tryLogin(saved)
   }, [])
 
@@ -30,11 +30,12 @@ export default function AdminPage() {
         headers: { Authorization: `Bearer ${t}` },
       })
       if (res.status === 401) { setError('Mot de passe incorrect'); return }
-      const data = await res.json() as { rooms: { code: string; phase: string; playerCount: number; mode: string }[] }
+      const data = await res.json() as { rooms: { code: string; phase: string; playerCount: number; mode: string; hostToken?: string }[] }
+      for (const r of data.rooms) if (r.hostToken) sessionStorage.setItem(`host-token-${r.code}`, r.hostToken)
       setToken(t)
       setRooms(data.rooms)
       setLoggedIn(true)
-      localStorage.setItem('admin-token', t)
+      sessionStorage.setItem('admin-token', t)
     } catch {
       setError('Impossible de contacter le serveur')
     }
@@ -46,7 +47,8 @@ export default function AdminPage() {
         headers: { Authorization: `Bearer ${t}` },
       })
       if (!res.ok) return
-      const data = await res.json() as { rooms: { code: string; phase: string; playerCount: number; mode: string }[] }
+      const data = await res.json() as { rooms: { code: string; phase: string; playerCount: number; mode: string; hostToken?: string }[] }
+      for (const r of data.rooms) if (r.hostToken) sessionStorage.setItem(`host-token-${r.code}`, r.hostToken)
       setRooms(data.rooms)
     } catch {}
   }
@@ -68,7 +70,8 @@ export default function AdminPage() {
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(config),
       })
-      const data = await res.json() as { code: string }
+      const data = await res.json() as { code: string; hostToken?: string }
+      if (data.hostToken) sessionStorage.setItem(`host-token-${data.code}`, data.hostToken)
       setRooms(prev => [...prev, { code: data.code, phase: 'WAITING', playerCount: 0, mode: newMode }])
     } finally {
       creatingRef.current = false
@@ -93,7 +96,10 @@ export default function AdminPage() {
   }
 
   function logout() {
-    localStorage.removeItem('admin-token')
+    sessionStorage.removeItem('admin-token')
+    for (const key of Object.keys(sessionStorage)) {
+      if (key.startsWith('host-token-')) sessionStorage.removeItem(key)
+    }
     setLoggedIn(false)
     setToken('')
     setRooms([])

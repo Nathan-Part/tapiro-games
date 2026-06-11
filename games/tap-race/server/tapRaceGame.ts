@@ -34,6 +34,11 @@ export const initialServerState: ServerGameState = {
   players: {},
 }
 
+/** Fabrique un état initial frais — jamais de référence `players` partagée entre rooms. */
+export function makeInitialState(): ServerGameState {
+  return { phase: 'WAITING', countdown: 3, timeLeft: 60, players: {} }
+}
+
 export function serverReducer(state: ServerGameState, event: ServerEvent): ServerGameState {
   switch (event.type) {
     case 'PLAYER_JOIN':
